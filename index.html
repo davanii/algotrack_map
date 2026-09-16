@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlgoTrack — Suivi de cultures d'algues</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+
+<style>
+  html, body { height: 100%; margin: 0; background-color: #f1f5f9; }
+  #map { height: 100%; width: 100%; background: #e2e8f0; }
+  .leaflet-control-zoom { margin-bottom: 20px !important; margin-right: 20px !important; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #e2e8f0; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+  .site-marker {
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11px;
+    border-radius: 9999px; border: 2px solid rgba(15, 23, 42, 0.35);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-family: 'Consolas', monospace;
+  }
+  .sidebar-scroll { scrollbar-gutter: stable; }
+  table.interval-table { table-layout: fixed; width: 100%; }
+  table.interval-table td, table.interval-table th {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans overflow-hidden">
+
+<!-- ============ TOPBAR ============ -->
+<header class="fixed top-0 left-0 right-0 z-[1100] h-16 bg-white/95 backdrop-blur border-b border-slate-200 flex items-center gap-4 px-4 md:px-6">
+  <div class="flex items-center gap-2 shrink-0">
+    <div class="w-8 h-8 rounded-md bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-slate-900 font-black text-sm">A</div>
+    <h1 class="text-slate-900 font-bold text-lg tracking-tight whitespace-nowrap">Algo<span class="text-emerald-500">Track</span></h1>
+  </div>
+
+  <div class="flex-1 flex items-center gap-3 flex-wrap md:flex-nowrap">
+    <div class="relative flex-1 min-w-[160px] max-w-sm">
+      <input id="searchInput" type="text" placeholder="Rechercher un site ou un TCHE..."
+        class="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500 transition" />
+      <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+      </svg>
+    </div>
+
+    <select id="sgrFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/60">
+      <option value="all">SGR : Tous</option>
+      <option value="positive">SGR : Positif</option>
+      <option value="negative">SGR : Négatif</option>
+    </select>
+
+    <select id="siteFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/60">
+      <option value="all">Site : Tous</option>
+    </select>
+  </div>
+
+  <a href="./dashboard.html"
+     class="hidden md:flex items-center text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition shrink-0">📊 Dashboard</a>
+
+  <div id="statusBadge" class="hidden md:flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
+    <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+    <span id="statusText">Chargement…</span>
+  </div>
+</header>
+
+<!-- ============ MAP ============ -->
+<div id="map" class="pt-16"></div>
+
+<!-- ============ LEGEND ============ -->
+<div class="fixed bottom-6 left-6 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-xl p-3.5 text-xs text-slate-600 shadow-xl w-60">
+  <p class="font-semibold text-slate-900 mb-2 tracking-wide">SGR moyen (%/jour)</p>
+  <div class="space-y-1.5">
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-700 text-white">&gt; 4</span> Forte croissance</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">1 → 4</span> Bonne croissance</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-200 text-slate-900">0 → 1</span> Croissance faible</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500 text-white">−2 → 0</span> Perte modérée</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-700 text-white">&lt; −2</span> Perte sévère</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-400 text-slate-900">*</span> En attente</div>
+  </div>
+  <p class="text-[10px] text-slate-400 italic mt-2 pt-2 border-t border-slate-200">Cliquez sur un cercle pour les détails</p>
+</div>
+
+<!-- ============ SIDEBAR ============ -->
+<aside id="sidebar"
+  class="fixed top-16 right-0 bottom-0 w-full sm:w-[420px] bg-white border-l border-slate-200 shadow-2xl z-[1050] translate-x-full transition-transform duration-300 ease-out flex flex-col">
+  <div class="p-5 border-b border-slate-200 shrink-0">
+    <div class="flex items-start justify-between gap-2">
+      <h2 id="sbTitle" class="text-xl font-bold text-slate-900 leading-tight">—</h2>
+      <button id="closeSidebar" class="text-slate-400 hover:text-slate-700 transition p-1 -mt-1 -mr-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p id="sbTehakeSecteur" class="text-sm text-slate-500 mt-1.5"></p>
+    <p id="sbTche" class="text-sm text-slate-500"></p>
+    <div class="mt-4 flex items-center gap-2">
+      <span class="text-xs uppercase tracking-wide text-slate-500">SGR moyen du site</span>
+      <span id="sbSgrBadge" class="text-sm font-bold px-2.5 py-1 rounded-full">—</span>
+    </div>
+  </div>
+  <div id="sbBody" class="flex-1 overflow-y-auto sidebar-scroll p-5 space-y-4"></div>
+</aside>
+
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/30 z-[1040] hidden sm:hidden"></div>
+
+<script>
+// ========================================================================
+// CONFIGURATION — ⚠️ 1 valeur à personnaliser : API_URL
+// ========================================================================
+const CONFIG = {
+  API_URL: "COLLE_ICI_L_URL_APPS_SCRIPT",
+  MAP_CENTER: [-23.38, 43.69],
+  MAP_ZOOM: 12,
+  MAP_BOUNDS_PADDING: [60, 60],
+  REFRESH_MS: 5 * 60 * 1000,
+  TILE_URL: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  TILE_ATTR: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics"
+  // Esri bloqué ou fond plus "papier" assorti au thème clair :
+  //   TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  //   TILE_ATTR: "© OpenStreetMap contributors"
+};
+
+const SELECTORS = {
+  map: "#map", sidebar: "#sidebar", sidebarOverlay: "#sidebarOverlay",
+  sidebarBody: "#sbBody", sidebarTitle: "#sbTitle", sidebarTehake: "#sbTehakeSecteur",
+  sidebarTche: "#sbTche", sidebarBadge: "#sbSgrBadge", closeSidebarBtn: "#closeSidebar",
+  searchInput: "#searchInput", sgrFilter: "#sgrFilter", siteFilter: "#siteFilter",
+  statusBadge: "#statusBadge", statusDot: "#statusDot", statusText: "#statusText"
+};
+
+// ========================================================================
+// RÈGLE DES COULEURS (5 niveaux + en attente) — identique au dashboard
+// ========================================================================
+const COLORS = {
+  pending:  { hex: "#94a3b8", tw: "bg-slate-400",  text: "text-slate-500", txt: "#0f172a" },
+  severe:   { hex: "#b91c1c", tw: "bg-red-700",    text: "text-red-700",   txt: "#ffffff" },
+  moderate: { hex: "#ef4444", tw: "bg-red-500",    text: "text-red-600",   txt: "#ffffff" },
+  low:      { hex: "#bbf7d0", tw: "bg-green-200",  text: "text-green-700", txt: "#0f172a" },
+  good:     { hex: "#22c55e", tw: "bg-green-500",  text: "text-green-600", txt: "#ffffff" },
+  strong:   { hex: "#15803d", tw: "bg-green-700",  text: "text-green-700", txt: "#ffffff" }
+};
+
+function statutKey(v) {
+  if (v === null || v === undefined || isNaN(v)) return "pending";
+  if (v > 4)   return "strong";
+  if (v >= 1)  return "good";
+  if (v >= 0)  return "low";
+  if (v >= -2) return "moderate";
+  return "severe";
+}
+
+// ========================================================================
+// ETAT GLOBAL
+// ========================================================================
+const STATE = {
+  map: null, markersLayerGroup: null, markers: {},
+  sitesData: {}, geoJsonPoints: null, hasInitialFit: false
+};
+
+// ========================================================================
+// DONNEES DE SECOURS — 6 sites = 6 niveaux de la légende
+// ========================================================================
+const MOCK_GEOJSON = {
+  type: "FeatureCollection",
+  features: [
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.7600, -23.3100] }, properties: {
+      site_id: "TAM", code_site: "TAM", site_nom: "Tambalang Nord", secteur: "BTL", tche: "Tovondrana Ariside", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "02/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "17/08/2025", duree: "15", txcr_calc: "+4.62", nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "01/09/2025", duree: "15", txcr_calc: "+5.10", nb: 30 }
+      ] } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.6890, -23.3540] }, properties: {
+      site_id: "BLM", code_site: "BLM", site_nom: "Ambolimoke", secteur: "ADK", tche: "Hajatiana Arstide", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+1.56", nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "31/08/2025", duree: "15", txcr_calc: "+0.98", nb: 29 },
+        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
+        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+1.10", nb: 30 }
+      ] } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.6550, -23.4020] }, properties: {
+      site_id: "BVK", code_site: "BVK", site_nom: "Belavenoky", secteur: "BDA", tche: "Franco", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "05/08/2025", duree: "",  txcr_calc: "*",    nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "20/08/2025", duree: "15", txcr_calc: "+0.45", nb: 30 }
+      ] } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.6720, -23.3810] }, properties: {
+      site_id: "APL", code_site: "APL", site_nom: "Ampasilava", secteur: "ADK", tche: "Bonhôte", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-0.42", nb: 29 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "15", txcr_calc: "-0.15", nb: 29 }
+      ] } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.7180, -23.3900] }, properties: {
+      site_id: "TSM", code_site: "TSM", site_nom: "Antsatsamoroy", secteur: "MKN", tche: "Sandrine", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-2.40", nb: 28 },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "15", txcr_calc: "-1.80", nb: 27 }
+      ] } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [43.7010, -23.3650] }, properties: {
+      site_id: "TSG", code_site: "TSG", site_nom: "Tserananangy", secteur: "MKN", tche: "TOVO Irène Julie", tehake: "THK5",
+      rows: [
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "07/08/2025", duree: "", txcr_calc: "*", nb: 30 }
+      ] } }
+  ]
+};
+
+// ========================================================================
+// HELPERS
+// ========================================================================
+function setStatus(isLive, text) {
+  const badge = document.querySelector(SELECTORS.statusBadge);
+  const dot = document.querySelector(SELECTORS.statusDot);
+  const label = document.querySelector(SELECTORS.statusText);
+  badge?.classList.remove("hidden");
+  if (label) label.textContent = text;
+  if (dot) dot.className = "w-2 h-2 rounded-full " + (isLive ? "bg-emerald-500" : "bg-amber-500");
+}
+
+function parseTxcr(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s || s === "*") return null;
+  const n = parseFloat(s.replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+
+function parseFrDate(s) {
+  let m = String(s || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  m = String(s || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return null;
+}
+
+function shortDate(d) {
+  return d ? `${("0" + d.getDate()).slice(-2)}/${("0" + (d.getMonth() + 1)).slice(-2)}` : "—";
+}
+
+function pesageShort(p) {
+  return String(p || "").split("—")[0].trim() || "P?";
+}
+
+// ========================================================================
+// CHARGEMENT DES DONNEES
+// ========================================================================
+async function loadData(strict) {
+  if (!CONFIG.API_URL.startsWith("http")) {
+    if (strict) throw new Error("API_URL non configurée");
+    console.warn("API_URL non configurée — mode démo");
+    setStatus(false, "Mode démo (données fictives)");
+    return MOCK_GEOJSON;
+  }
+  try {
+    const res = await fetch(CONFIG.API_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const geo = await res.json();
+    if (geo.error) throw new Error(geo.error);
+    if (!geo.features || !geo.features.length) throw new Error("Aucune donnée renvoyée");
+    if (geo.excluded && geo.excluded.length)
+      console.warn("Sites ignorés (absents du GeoJSON) :", geo.excluded.join(", "));
+    setStatus(true, "Données en direct");
+    return geo;
+  } catch (err) {
+    if (strict) throw err;
+    console.warn("API indisponible, mode démo :", err.message);
+    setStatus(false, "Mode démo (données fictives)");
+    return MOCK_GEOJSON;
+  }
+}
+
+function ingest(geo) {
+  STATE.geoJsonPoints = geo;
+  STATE.sitesData = {};
+  geo.features.forEach(f => {
+    const p = f.properties;
+    p.sgrMoyen = computeSgrMoyen(p.rows || []);
+    STATE.sitesData[p.site_id] = p;
+  });
+}
+
+// ========================================================================
+// CALCULS
+// ========================================================================
+function computeSgrMoyen(rows) {
+  const values = rows.map(r => parseTxcr(r.txcr_calc)).filter(v => v !== null);
+  if (values.length === 0) return null;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function buildLineTables(rows) {
+  const byLine = rows.reduce((acc, row) => {
+    (acc[row.ligne_test] = acc[row.ligne_test] || []).push(row);
+    return acc;
+  }, {});
+
+  const lineNames = Object.keys(byLine)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  return lineNames.map(lineName => {
+    const sorted = byLine[lineName].slice().sort((a, b) =>
+      (parseFrDate(a.date_pesage)?.getTime() || 0) - (parseFrDate(b.date_pesage)?.getTime() || 0));
+    const intervals = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], curr = sorted[i];
+      intervals.push({
+        label: `${pesageShort(prev.pesage)} → ${pesageShort(curr.pesage)}`,
+        dates: `${shortDate(parseFrDate(prev.date_pesage))} → ${shortDate(parseFrDate(curr.date_pesage))}`,
+        duree: curr.duree ? `${curr.duree}j` : "—",
+        sgr: curr.txcr_calc,
+        boutures: (prev.nb != null && curr.nb != null)
+          ? `${prev.nb} → ${curr.nb}`
+          : (curr.nb != null ? String(curr.nb) : "—"),
+        perte: prev.nb != null && curr.nb != null && curr.nb < prev.nb
+      });
+    }
+    return { lineName, intervals };
+  });
+}
+
+// ========================================================================
+// COULEURS
+// ========================================================================
+function getColorForSgr(value) {
+  const val = typeof value === "string" ? parseTxcr(value) : value;
+  return COLORS[statutKey(val)];
+}
+
+function getColorClassForSgr(value) {
+  if (parseTxcr(value) === null) return "text-slate-400";
+  return `${getColorForSgr(value).text} font-semibold`;
+}
+
+// ========================================================================
+// CARTE
+// ========================================================================
+function initMap() {
+  // ⚠️ On passe l'élément DOM, pas le sélecteur ("#map" ne marche pas avec Leaflet)
+  STATE.map = L.map(document.querySelector(SELECTORS.map), { zoomControl: false })
+    .setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+
+  L.tileLayer(CONFIG.TILE_URL, { attribution: CONFIG.TILE_ATTR, maxZoom: 19 }).addTo(STATE.map);
+
+  L.control.zoom({ position: "topright" }).addTo(STATE.map);
+  STATE.markersLayerGroup = L.layerGroup().addTo(STATE.map);
+}
+
+function renderMarkers(sitesToShow) {
+  STATE.markersLayerGroup.clearLayers();
+  STATE.markers = {};
+  if (!STATE.geoJsonPoints) return;
+  const bounds = [];
+
+  STATE.geoJsonPoints.features.forEach(feature => {
+    const siteId = feature.properties.site_id;
+    const site = STATE.sitesData[siteId];
+    if (!site) return;
+    if (sitesToShow && !sitesToShow.has(siteId)) return;
+
+    const [lng, lat] = feature.geometry.coordinates;
+    const color = getColorForSgr(site.sgrMoyen);
+
+    const icon = L.divIcon({
+      className: "",
+      html: `<div class="site-marker" style="width:38px;height:38px;background-color:${color.hex};color:${color.txt}">${siteId}</div>`,
+      iconSize: [38, 38],
+      iconAnchor: [19, 19]
+    });
+
+    const marker = L.marker([lat, lng], { icon }).addTo(STATE.markersLayerGroup);
+    marker.on("click", () => openSidebar(siteId));
+    STATE.markers[siteId] = marker;
+    bounds.push([lat, lng]);
+  });
+
+  if (bounds.length > 0 && !STATE.hasInitialFit) {
+    STATE.map.fitBounds(bounds, { padding: CONFIG.MAP_BOUNDS_PADDING });
+    STATE.hasInitialFit = true;
+  }
+}
+
+// ========================================================================
+// SIDEBAR
+// ========================================================================
+function openSidebar(siteId) {
+  const site = STATE.sitesData[siteId];
+  if (!site) return;
+
+  const $title = document.querySelector(SELECTORS.sidebarTitle);
+  const $tehake = document.querySelector(SELECTORS.sidebarTehake);
+  const $tche = document.querySelector(SELECTORS.sidebarTche);
+  const $badge = document.querySelector(SELECTORS.sidebarBadge);
+  const $body = document.querySelector(SELECTORS.sidebarBody);
+  const $sidebar = document.querySelector(SELECTORS.sidebar);
+  const $overlay = document.querySelector(SELECTORS.sidebarOverlay);
+
+  if ($title) $title.textContent = `${site.code_site} — ${site.site_nom}`;
+  if ($tehake) $tehake.textContent = `Tehake : ${site.tehake || "—"} | Secteur : ${site.secteur || "—"}`;
+  if ($tche) $tche.textContent = `Technicien (TCHE) : ${site.tche || "—"}`;
+
+  if ($badge) {
+    const color = getColorForSgr(site.sgrMoyen);
+    $badge.textContent = site.sgrMoyen === null
+      ? "En attente"
+      : `${site.sgrMoyen > 0 ? "+" : ""}${site.sgrMoyen.toFixed(2)} %/j`;
+    $badge.className = `text-sm font-bold px-2.5 py-1 rounded-full ${color.tw} ${color.txt === "#ffffff" ? "text-white" : "text-slate-900"}`;
+  }
+
+  if ($body) {
+    $body.innerHTML = "";
+    const lineTables = buildLineTables(site.rows);
+
+    if (lineTables.length === 0) {
+      $body.innerHTML = `<p class="text-sm text-slate-500 italic">Aucune donnée de pesage disponible pour ce site.</p>`;
+    }
+
+    lineTables.forEach(lt => {
+      const card = document.createElement("div");
+      card.className = "bg-slate-50 border border-slate-200 rounded-xl p-4";
+
+      let rowsHtml = "";
+      if (lt.intervals.length === 0) {
+        rowsHtml = `<tr><td colspan="5" class="text-xs text-slate-500 italic py-2">En attente de la prochaine pesée</td></tr>`;
+      } else {
+        rowsHtml = lt.intervals.map(iv => `
+          <tr class="border-t border-slate-200">
+            <td class="py-2 pr-2 text-slate-700 text-xs">${iv.label}</td>
+            <td class="py-2 pr-2 text-slate-500 text-xs">${iv.dates}</td>
+            <td class="py-2 pr-2 text-slate-500 text-xs">${iv.duree}</td>
+            <td class="py-2 pr-2 text-xs ${iv.perte ? "text-amber-600" : "text-slate-500"}">${iv.boutures}</td>
+            <td class="py-2 text-xs ${getColorClassForSgr(iv.sgr)}">${iv.sgr === "*" ? "En attente" : iv.sgr}</td>
+          </tr>`).join("");
+      }
+
+      card.innerHTML = `
+        <h3 class="text-cyan-600 font-semibold text-sm mb-2 tracking-wide">Ligne ${lt.lineName}</h3>
+        <table class="interval-table text-left">
+          <colgroup><col style="width:24%"><col style="width:22%"><col style="width:10%"><col style="width:16%"><col style="width:28%"></colgroup>
+          <thead>
+            <tr class="text-[10px] uppercase text-slate-500 tracking-wide">
+              <th class="pb-1.5 font-medium">Intervalle</th>
+              <th class="pb-1.5 font-medium">Dates</th>
+              <th class="pb-1.5 font-medium">Durée</th>
+              <th class="pb-1.5 font-medium">Bout.</th>
+              <th class="pb-1.5 font-medium">SGR</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>`;
+      $body.appendChild(card);
+    });
+  }
+
+  $sidebar?.classList.remove("translate-x-full");
+  $overlay?.classList.remove("hidden");
+}
+
+function closeSidebar() {
+  document.querySelector(SELECTORS.sidebar)?.classList.add("translate-x-full");
+  document.querySelector(SELECTORS.sidebarOverlay)?.classList.add("hidden");
+}
+
+document.querySelector(SELECTORS.closeSidebarBtn)?.addEventListener("click", closeSidebar);
+document.querySelector(SELECTORS.sidebarOverlay)?.addEventListener("click", closeSidebar);
+
+// ========================================================================
+// FILTRES
+// ========================================================================
+function populateSiteFilter() {
+  const $select = document.querySelector(SELECTORS.siteFilter);
+  if (!$select) return;
+  Object.keys(STATE.sitesData).sort().forEach(code => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = `${code} — ${STATE.sitesData[code].site_nom}`;
+    $select.appendChild(opt);
+  });
+}
+
+function applyFilters() {
+  const query = (document.querySelector(SELECTORS.searchInput)?.value || "").trim().toLowerCase();
+  const sgrFilterVal = document.querySelector(SELECTORS.sgrFilter)?.value || "all";
+  const siteFilterVal = document.querySelector(SELECTORS.siteFilter)?.value || "all";
+  const visible = new Set();
+
+  Object.values(STATE.sitesData).forEach(site => {
+    let matches = true;
+    if (siteFilterVal !== "all" && site.code_site !== siteFilterVal) matches = false;
+    if (matches && query) {
+      const haystack = `${site.site_nom} ${site.code_site} ${site.tche}`.toLowerCase();
+      if (!haystack.includes(query)) matches = false;
+    }
+    if (matches && sgrFilterVal === "positive" && !(site.sgrMoyen !== null && site.sgrMoyen > 0)) matches = false;
+    if (matches && sgrFilterVal === "negative" && !(site.sgrMoyen !== null && site.sgrMoyen < 0)) matches = false;
+    if (matches) visible.add(site.code_site);
+  });
+
+  renderMarkers(visible);
+}
+
+document.querySelector(SELECTORS.searchInput)?.addEventListener("input", applyFilters);
+document.querySelector(SELECTORS.sgrFilter)?.addEventListener("change", applyFilters);
+document.querySelector(SELECTORS.siteFilter)?.addEventListener("change", applyFilters);
+
+// ========================================================================
+// BOOTSTRAP + RAFRAICHISSEMENT AUTO (5 min)
+// ========================================================================
+async function bootstrap() {
+  initMap();
+  ingest(await loadData(false));
+  populateSiteFilter();
+  renderMarkers(null);
+}
+
+bootstrap();
+
+setInterval(async () => {
+  if (!CONFIG.API_URL.includes("script.google.com")) return;
+  try {
+    ingest(await loadData(true));
+    applyFilters();
+  } catch (e) { console.warn("Rafraîchissement échoué :", e.message); }
+}, CONFIG.REFRESH_MS);
+</script>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlgoTrack — Dashboard</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  html, body { margin: 0; background: #f1f5f9; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #e2e8f0; }
+  ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+  .panel { background: rgba(255,255,255,.95); border: 1px solid #e2e8f0; border-radius: .75rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .kpi-value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans">
+
+<!-- ============ HEADER ============ -->
+<header class="fixed top-0 left-0 right-0 z-[1100] h-16 bg-white/95 backdrop-blur border-b border-slate-200 flex items-center gap-4 px-4 md:px-6">
+  <div class="flex items-center gap-2 shrink-0">
+    <div class="w-8 h-8 rounded-md bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-slate-900 font-black text-sm">A</div>
+    <h1 class="text-slate-900 font-bold text-lg tracking-tight whitespace-nowrap">Algo<span class="text-emerald-500">Track</span></h1>
+    <span class="text-slate-400 text-sm hidden sm:inline">— Dashboard</span>
+  </div>
+  <div class="flex-1"></div>
+  <div class="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
+    <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+    <span id="statusText">Chargement…</span>
+  </div>
+  <a href="./index.html"
+     class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200 transition">🗺️ Carte</a>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 pt-20 pb-10 space-y-4">
+
+  <!-- ============ KPI ============ -->
+  <section id="kpiRow" class="grid grid-cols-2 md:grid-cols-4 gap-3"></section>
+
+  <!-- ============ ALERTES ============ -->
+  <section id="alertBox" class="hidden space-y-2"></section>
+
+  <!-- ============ GRAPHIQUES : évolution + statuts ============ -->
+  <section class="grid lg:grid-cols-5 gap-4">
+    <div class="panel p-4 lg:col-span-3">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Évolution mensuelle du taux de croissance (%/jour)</h2>
+      <div class="h-64"><canvas id="chartEvolution"></canvas></div>
+    </div>
+    <div class="panel p-4 lg:col-span-2">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Répartition des sites par statut</h2>
+      <div class="h-64"><canvas id="chartStatuts"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ============ GRAPHIQUES : segments ============ -->
+  <section class="grid md:grid-cols-3 gap-4">
+    <div class="panel p-4">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par secteur (%/j)</h2>
+      <div class="h-56"><canvas id="chartSecteurs"></canvas></div>
+    </div>
+    <div class="panel p-4" id="panelVariete">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par variété (%/j)</h2>
+      <div class="h-56"><canvas id="chartVariete"></canvas></div>
+    </div>
+    <div class="panel p-4" id="panelTehake">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par tehake (%/j)</h2>
+      <div class="h-56"><canvas id="chartTehake"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ============ GRAPHIQUES : santé ============ -->
+  <section class="grid lg:grid-cols-2 gap-4" id="secSante">
+    <div class="panel p-4">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Pression sanitaire vs croissance</h2>
+      <div class="h-72"><canvas id="chartScatter"></canvas></div>
+      <p id="corrText" class="text-[11px] text-slate-500 mt-2"></p>
+    </div>
+    <div class="panel p-4">
+      <h2 class="text-sm font-semibold text-slate-900 mb-3">Pression sanitaire par site (% de pesées avec signal)</h2>
+      <div class="h-72"><canvas id="chartSante"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ============ TABLEAU DES SITES ============ -->
+  <section class="panel p-4">
+    <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <h2 class="text-sm font-semibold text-slate-900">Sites <span id="tableCount" class="text-slate-400 font-normal"></span></h2>
+      <select id="sortSelect" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
+        <option value="sgr-asc">Trier : taux croissant (à surveiller d'abord)</option>
+        <option value="sgr-desc">Trier : taux décroissant</option>
+        <option value="survie-asc">Trier : survie la plus faible</option>
+        <option value="sante-desc">Trier : pression sanitaire la plus forte</option>
+        <option value="recent">Trier : mesure la plus récente</option>
+        <option value="nom">Trier : nom du site</option>
+      </select>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="text-[10px] uppercase text-slate-500 tracking-wide border-b border-slate-200">
+            <th class="py-2 pr-3 font-medium">Site</th>
+            <th class="py-2 pr-3 font-medium">Secteur</th>
+            <th class="py-2 pr-3 font-medium">Variété</th>
+            <th class="py-2 pr-3 font-medium">Taux moyen</th>
+            <th class="py-2 pr-3 font-medium">Survie</th>
+            <th class="py-2 pr-3 font-medium">Boutures</th>
+            <th class="py-2 pr-3 font-medium">Biomasse</th>
+            <th class="py-2 pr-3 font-medium">Santé</th>
+            <th class="py-2 pr-3 font-medium">Cadence</th>
+            <th class="py-2 font-medium">Dernière mesure</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="text-xs"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="text-center text-[11px] text-slate-400">Synchro auto toutes les 5 min — dernière mise à jour : <span id="updatedAt">—</span></p>
+</main>
+
+<script>
+// ========================================================================
+// CONFIG — ⚠️ 1 valeur à personnaliser : API_URL
+// ========================================================================
+const CONFIG = {
+  API_URL: "COLLE_ICI_L_URL_APPS_SCRIPT",   // même URL /exec que la carte
+  REFRESH_MS: 5 * 60 * 1000,
+  SEUIL_FRAICHE_JOURS: 15,
+  SEUIL_ALERTE_JOURS: 30
+};
+
+// ========================================================================
+// RÈGLE DES COULEURS — identique à la carte (5 niveaux + en attente)
+// ========================================================================
+const COLORS = {
+  pending:  { hex: "#94a3b8", tw: "bg-slate-400",  text: "text-slate-500", txt: "#0f172a" },
+  severe:   { hex: "#b91c1c", tw: "bg-red-700",    text: "text-red-700",   txt: "#ffffff" },
+  moderate: { hex: "#ef4444", tw: "bg-red-500",    text: "text-red-600",   txt: "#ffffff" },
+  low:      { hex: "#bbf7d0", tw: "bg-green-200",  text: "text-green-700", txt: "#0f172a" },
+  good:     { hex: "#22c55e", tw: "bg-green-500",  text: "text-green-600", txt: "#ffffff" },
+  strong:   { hex: "#15803d", tw: "bg-green-700",  text: "text-green-700", txt: "#ffffff" }
+};
+const STATUT_LABELS = {
+  strong: "Forte (> 4)", good: "Bonne (1 → 4)", low: "Faible (0 → 1)",
+  moderate: "Modérée (−2 → 0)", severe: "Sévère (< −2)", pending: "En attente"
+};
+const STATUT_ORDER = ["strong", "good", "low", "moderate", "severe", "pending"];
+
+function statutKey(v) {
+  if (v === null || v === undefined || isNaN(v)) return "pending";
+  if (v > 4)   return "strong";
+  if (v >= 1)  return "good";
+  if (v >= 0)  return "low";
+  if (v >= -2) return "moderate";
+  return "severe";
+}
+function colorFor(v) { return COLORS[statutKey(v)]; }
+
+const PALETTE = ["#10b981", "#0ea5e9", "#8b5cf6", "#f59e0b", "#ec4899", "#14b8a6", "#ef4444", "#a855f7"];
+const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+const charts = {};
+
+// ========================================================================
+// HELPERS
+// ========================================================================
+function parseTxcr(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s || s === "*") return null;
+  const n = parseFloat(s.replace(",", "."));
+  return isNaN(n) ? null : n;
+}
+function parseFrDate(s) {
+  let m = String(s || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  m = String(s || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return null;
+}
+function fmtDate(d) {
+  return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear();
+}
+function fmtMois(ym) { const [y, m] = ym.split("-"); return `${MOIS[+m - 1]} ${y.slice(2)}`; }
+function joursDepuis(d) { return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 864e5)) : null; }
+function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }
+
+function pearson(pairs) {
+  const n = pairs.length;
+  if (n < 3) return null;
+  const mx = mean(pairs.map(p => p[0])), my = mean(pairs.map(p => p[1]));
+  let num = 0, dx = 0, dy = 0;
+  pairs.forEach(([x, y]) => { num += (x - mx) * (y - my); dx += (x - mx) ** 2; dy += (y - my) ** 2; });
+  return (dx && dy) ? num / Math.sqrt(dx * dy) : null;
+}
+
+function survieColor(v) { return v >= 80 ? COLORS.good : v >= 50 ? COLORS.low : COLORS.moderate; }
+
+function badgeSgr(sgr) {
+  const key = statutKey(sgr), c = COLORS[key];
+  const txt = sgr === null ? "En attente" : `${sgr > 0 ? "+" : ""}${sgr.toFixed(2)} %/j`;
+  return `<span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${c.tw} ${c.txt === "#ffffff" ? "text-white" : "text-slate-900"}">${txt}</span>`;
+}
+function dotFraicheur(lastDate) {
+  const j = joursDepuis(lastDate);
+  const hex = j === null ? COLORS.pending.hex
+    : j <= CONFIG.SEUIL_FRAICHE_JOURS ? COLORS.good.hex
+    : j <= CONFIG.SEUIL_ALERTE_JOURS ? COLORS.moderate.hex
+    : COLORS.severe.hex;
+  return `<span class="inline-block w-2 h-2 rounded-full mr-1.5" style="background:${hex}"></span>`;
+}
+function setStatus(isLive, text) {
+  document.querySelector("#statusText").textContent = text;
+  document.querySelector("#statusDot").className = "w-2 h-2 rounded-full " + (isLive ? "bg-emerald-500" : "bg-amber-500");
+}
+
+// ========================================================================
+// DONNEES DE SECOURS — 6 sites = 6 niveaux (santé au format v6)
+// ========================================================================
+function mkSite(code, nom, secteur, lon, lat, txcrs, opts = {}) {
+  const rows = [];
+  const base = new Date(); base.setDate(base.getDate() - (txcrs.length + 1) * 15);
+  const mk = (i, d, txcr, w, nb) => ({
+    ligne_test: "LT 1 (Tehake THK5)" + (opts.variete ? " · " + opts.variete : ""),
+    tehake: String(opts.tehake || "THK5"),
+    pesage: "P" + i, date_pesage: fmtDate(d),
+    duree: i === 0 ? "" : "15", txcr_calc: txcr,
+    nb, poids: String(w),
+    variete: opts.variete || "Sacol (Cottonii)",
+    sante: {
+      efa: (opts.efa && i >= Math.ceil(txcrs.length / 2)) ? opts.efa : 0,
+      iceice: opts.iceice ? (i === 1 ? true : false) : false,
+      broutage: false,
+      lomodraty: opts.lomodraty && i === 2 ? true : false
+    }
+  });
+  let w = 1.8, nb = 30;
+  rows.push(mk(0, base, "*", w, nb));
+  txcrs.forEach((v, i) => {
+    w = w * Math.pow(1 + v / 100, 15);
+    if (opts.perte && i === 1) nb--;
+    rows.push(mk(i + 1, new Date(base.getTime() + (i + 1) * 15 * 864e5), (v >= 0 ? "+" : "") + v.toFixed(2), +w.toFixed(2), nb));
+  });
+  return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+    properties: { site_id: code, code_site: code, site_nom: nom, secteur, tche: "—", tehake: String(opts.tehake || "THK5"), rows } };
+}
+const MOCK_GEOJSON = { type: "FeatureCollection", features: [
+  mkSite("TAM", "Tambalang Nord", "BTL", 43.760, -23.310, [4.6, 5.1]),
+  mkSite("BLM", "Ambolimoke", "ADK", 43.689, -23.354, [1.8, 2.1, 1.9], { perte: true }),
+  mkSite("BVK", "Belavenoky", "BDA", 43.655, -23.402, [0.3, 0.45], { variete: "Tambalang" }),
+  mkSite("APL", "Ampasilava", "ADK", 43.672, -23.381, [-0.4, -0.2]),
+  mkSite("TSM", "Antsatsamoroy", "MKN", 43.718, -23.390, [-2.4, -1.8], { iceice: true, efa: 3, lomodraty: true }),
+  mkSite("TSG", "Tserananangy", "MKN", 43.701, -23.365, [])
+]};
+
+// ========================================================================
+// CHARGEMENT
+// ========================================================================
+async function loadData(strict) {
+  if (!CONFIG.API_URL.startsWith("http")) {
+    if (strict) throw new Error("API_URL non configurée");
+    console.warn("API_URL non configurée — mode démo");
+    setStatus(false, "Mode démo (données fictives)");
+    return MOCK_GEOJSON;
+  }
+  try {
+    const res = await fetch(CONFIG.API_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const geo = await res.json();
+    if (geo.error) throw new Error(geo.error);
+    if (!geo.features || !geo.features.length) throw new Error("Aucune donnée");
+    if (geo.excluded && geo.excluded.length)
+      console.warn("Sites sans correspondance GeoJSON :", geo.excluded.join(", "));
+    setStatus(true, "Données en direct");
+    return geo;
+  } catch (err) {
+    if (strict) throw err;
+    console.warn("API indisponible, mode démo :", err.message);
+    setStatus(false, "Mode démo (données fictives)");
+    return MOCK_GEOJSON;
+  }
+}
+
+// ========================================================================
+// AGRÉGATION PAR SITE (santé au format v6 : broutage / lomodraty)
+// ========================================================================
+function computeSites(geo) {
+  return geo.features.map(f => {
+    const p = f.properties, rows = p.rows || [];
+    const sgrVals = rows.map(r => parseTxcr(r.txcr_calc)).filter(v => v !== null);
+    const dates = rows.map(r => parseFrDate(r.date_pesage)).filter(Boolean).sort((a, b) => a - b);
+    const lastDate = dates.length ? dates[dates.length - 1] : null;
+
+    const byLine = {};
+    rows.forEach(r => (byLine[r.ligne_test] = byLine[r.ligne_test] || []).push(r));
+    let premierNb = 0, dernierNb = 0, biomasse = 0, premierPoids = 0, deltaBio = 0, lignes = 0;
+    Object.values(byLine).forEach(rs => {
+      const sorted = rs.slice().sort((a, b) =>
+        (parseFrDate(a.date_pesage)?.getTime() ?? 0) - (parseFrDate(b.date_pesage)?.getTime() ?? 0));
+      const nbs = sorted.map(r => parseInt(r.nb, 10)).filter(v => !isNaN(v));
+      if (nbs.length) { premierNb += nbs[0]; dernierNb += nbs[nbs.length - 1]; lignes++; }
+      const pds = sorted.map(r => parseFloat(r.poids)).filter(v => !isNaN(v) && v > 0);
+      if (pds.length) { premierPoids += pds[0]; biomasse += pds[pds.length - 1]; deltaBio += pds[pds.length - 1] - pds[0]; }
+    });
+
+    let iceN = 0, iceP = 0, santeN = 0, santeP = 0, efaMax = null;
+    rows.forEach(r => {
+      const s = r.sante || {};
+      if (s.iceice === true || s.iceice === false) { iceN++; if (s.iceice) iceP++; }
+      const renseigne = s.iceice === true || s.iceice === false || s.broutage === true || s.broutage === false
+        || s.lomodraty === true || s.lomodraty === false || s.efa != null;
+      const signal = s.iceice === true || s.broutage === true || s.lomodraty === true || (s.efa != null && s.efa >= 1);
+      if (renseigne) { santeN++; if (signal) santeP++; }
+      if (s.efa != null) efaMax = efaMax === null ? s.efa : Math.max(efaMax, s.efa);
+    });
+
+    let cadence = null;
+    if (dates.length >= 2) {
+      let sum = 0;
+      for (let i = 1; i < dates.length; i++) sum += (dates[i] - dates[i - 1]) / 864e5;
+      cadence = sum / (dates.length - 1);
+    }
+
+    return {
+      code: p.site_id, nom: p.site_nom, secteur: p.secteur || "—",
+      sgr: sgrVals.length ? mean(sgrVals) : null,
+      nbIntervalles: sgrVals.length,
+      premierNb, dernierNb, pertes: Math.max(0, premierNb - dernierNb),
+      survie: premierNb > 0 ? 100 * dernierNb / premierNb : null,
+      premierPoids, biomasse, deltaBio, lignes, lastDate,
+      iceP, iceN, prevIce: iceN ? iceP / iceN : null,
+      santeP, santeN, prevSante: santeN ? santeP / santeN : null,
+      efaMax, cadence,
+      varietes: [...new Set(rows.map(r => (r.variete || "").trim()).filter(Boolean))]
+    };
+  });
+}
+
+function buildEvolution(geo) {
+  const acc = {};
+  geo.features.forEach(f => {
+    const sec = f.properties.secteur || "—";
+    (f.properties.rows || []).forEach(r => {
+      const v = parseTxcr(r.txcr_calc), d = parseFrDate(r.date_pesage);
+      if (v === null || !d) return;
+      const mois = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      ((acc[sec] = acc[sec] || {})[mois] = acc[sec][mois] || []).push(v);
+    });
+  });
+  const moisList = [...new Set(Object.values(acc).flatMap(o => Object.keys(o)))].sort();
+  const secteurs = Object.keys(acc).sort();
+  const datasets = [{
+    label: "Global",
+    data: moisList.map(m => { const v = mean(secteurs.flatMap(s => acc[s][m] || [])); return v === null ? null : +v.toFixed(2); }),
+    borderColor: "#334155", backgroundColor: "#334155",
+    borderDash: [6, 4], borderWidth: 2, tension: 0.3, spanGaps: true, pointRadius: 2
+  }].concat(secteurs.map((sec, i) => ({
+    label: sec,
+    data: moisList.map(m => { const v = mean(acc[sec][m] || []); return v === null ? null : +v.toFixed(2); }),
+    borderColor: PALETTE[i % PALETTE.length], backgroundColor: PALETTE[i % PALETTE.length],
+    tension: 0.3, spanGaps: true, pointRadius: 3
+  })));
+  return { labels: moisList.map(fmtMois), datasets };
+}
+
+function buildByField(geo, field, emptyLabel) {
+  const acc = {};
+  geo.features.forEach(f => (f.properties.rows || []).forEach(r => {
+    const v = parseTxcr(r.txcr_calc);
+    if (v === null) return;
+    const k = String(r[field] || "").trim() || emptyLabel;
+    (acc[k] = acc[k] || []).push(v);
+  }));
+  const keys = Object.keys(acc).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return {
+    labels: keys,
+    values: keys.map(k => mean(acc[k])),
+    counts: keys.map(k => acc[k].length)
+  };
+}
+
+// ========================================================================
+// RENDU
+// ========================================================================
+function renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce) {
+  const t2 = (sgrGlobal !== null && sgrGlobal > 0) ? Math.log(2) / Math.log(1 + sgrGlobal / 100) : null;
+  const survieC = survieGlob === null ? COLORS.pending : survieColor(survieGlob);
+  const iceC = prevIceGlob === null ? COLORS.pending : prevIceGlob > 0.2 ? COLORS.severe : prevIceGlob > 0 ? COLORS.moderate : COLORS.good;
+  const compC = completude === null ? COLORS.pending : completude >= 90 ? COLORS.good : completude >= 70 ? COLORS.low : COLORS.moderate;
+
+  const kpis = [
+    { label: "Sites suivis", value: sites.length, sub: `${sites.reduce((a, s) => a + s.lignes, 0)} lignes test` },
+    { label: "Taux moyen global", value: sgrGlobal === null ? "—" : `${sgrGlobal > 0 ? "+" : ""}${sgrGlobal.toFixed(2)} %/j`,
+      valueColor: sgrGlobal === null ? "" : colorFor(sgrGlobal).text, sub: "tous intervalles confondus" },
+    { label: "Temps de doublement", value: t2 === null ? "—" : `${t2.toFixed(0)} j`, sub: "au rythme moyen actuel" },
+    { label: "Survie des boutures", value: survieGlob === null ? "—" : `${survieGlob.toFixed(0)} %`,
+      valueColor: survieGlob === null ? "" : survieC.text, sub: "P0 → dernier pesage" },
+    ...(hasPoids ? [{ label: "Biomasse gagnée", value: `${bioDelta >= 0 ? "+" : ""}${bioDelta.toFixed(1)} kg`,
+      valueColor: bioDelta < 0 ? "text-red-600" : "text-emerald-600", sub: `en suivi : ${bioTot.toFixed(0)} kg` }] : []),
+    ...(hasIce ? [{ label: "Prévalence ice-ice", value: `${(prevIceGlob * 100).toFixed(0)} %`,
+      valueColor: iceC.text, sub: "des pesées signalées" }] : []),
+    { label: "Sites à taux négatif", value: sitesNeg.length, valueColor: sitesNeg.length ? "text-red-600" : "text-slate-800",
+      sub: sitesNeg.length ? sitesNeg.map(s => s.code).join(", ") : "aucun 🎉" },
+    { label: "Complétude des données", value: completude === null ? "—" : `${completude.toFixed(0)} %`,
+      valueColor: compC.text, sub: "poids + boutures + date" }
+  ];
+  document.querySelector("#kpiRow").innerHTML = kpis.map(k => `
+    <div class="panel p-4">
+      <p class="text-[10px] uppercase tracking-wide text-slate-500">${k.label}</p>
+      <p class="kpi-value mt-1 ${k.valueColor || "text-slate-900"}">${k.value}</p>
+      <p class="text-[11px] text-slate-500 mt-1 truncate" title="${k.sub || ""}">${k.sub || ""}</p>
+    </div>`).join("");
+}
+
+function renderAlerts(sitesNeg, sitesRetard, sitesSante) {
+  const box = document.querySelector("#alertBox");
+  const items = [];
+  if (sitesNeg.length) items.push(
+    `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-xs">
+      ⚠ <b>${sitesNeg.length} site(s) à taux négatif</b> — régression de biomasse : ${sitesNeg.map(s => `${s.code} (${s.sgr.toFixed(2)})`).join(", ")}</div>`);
+  if (sitesSante.length) items.push(
+    `<div class="bg-purple-50 border border-purple-200 text-purple-700 rounded-xl px-4 py-3 text-xs">
+      🩺 <b>Signal sanitaire</b> : ${sitesSante.map(s => {
+        const d = [];
+        if (s.prevIce > 0) d.push(`🧊 ${(s.prevIce * 100).toFixed(0)}%`);
+        if (s.efaMax !== null && s.efaMax >= 3) d.push(`EFA st. ${s.efaMax}`);
+        return `${s.code} (${d.join(", ")})`;
+      }).join(", ")}</div>`);
+  if (sitesRetard.length) items.push(
+    `<div class="bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-xs">
+      🕒 <b>${sitesRetard.length} site(s) sans pesée depuis plus de ${CONFIG.SEUIL_ALERTE_JOURS} jours</b> : ${sitesRetard.map(s => s.code).join(", ")}</div>`);
+  box.innerHTML = items.join("");
+  box.classList.toggle("hidden", items.length === 0);
+}
+
+function mkChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.querySelector(id), cfg);
+}
+function barData(b) {
+  return { labels: b.labels, datasets: [{ data: b.values.map(v => v === null ? null : +v.toFixed(2)),
+    backgroundColor: b.values.map(v => colorFor(v).hex), borderRadius: 6, _counts: b.counts }] };
+}
+const barOpts = (yTitle) => ({
+  indexAxis: "y", responsive: true, maintainAspectRatio: false,
+  scales: { x: { grid: { color: "#e2e8f0" }, title: { display: !!yTitle, text: yTitle || "" } }, y: { grid: { display: false } } },
+  plugins: { legend: { display: false },
+    tooltip: { callbacks: { afterLabel: c => `n = ${(c.dataset._counts || [])[c.dataIndex] ?? "—"} intervalles` } } }
+});
+
+function renderCharts(sites, geo, statuts, opts) {
+  Chart.defaults.color = "#64748b";
+  Chart.defaults.borderColor = "#e2e8f0";
+  Chart.defaults.font.family = "ui-sans-serif, system-ui";
+
+  mkChart("#chartEvolution", { type: "line", data: buildEvolution(geo),
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { y: { grid: { color: "#e2e8f0" } }, x: { grid: { display: false } } },
+      plugins: { legend: { labels: { boxWidth: 12 } } } } });
+
+  mkChart("#chartStatuts", { type: "doughnut",
+    data: {
+      labels: STATUT_ORDER.map(k => STATUT_LABELS[k]),
+      datasets: [{ data: STATUT_ORDER.map(k => statuts[k]),
+        backgroundColor: STATUT_ORDER.map(k => COLORS[k].hex),
+        borderColor: "#ffffff", borderWidth: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, cutout: "62%",
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10 } } } } });
+
+  const bySec = {};
+  sites.forEach(s => { if (s.sgr !== null) (bySec[s.secteur] = bySec[s.secteur] || []).push(s.sgr); });
+  const secs = Object.keys(bySec).sort();
+  mkChart("#chartSecteurs", { type: "bar",
+    data: { labels: secs, datasets: [{ data: secs.map(sec => +mean(bySec[sec]).toFixed(2)),
+      backgroundColor: secs.map(sec => colorFor(mean(bySec[sec])).hex), borderRadius: 6 }] },
+    options: barOpts() });
+
+  if (opts.hasVariete) mkChart("#chartVariete", { type: "bar", data: barData(buildByField(geo, "variete", "Non renseignée")), options: barOpts() });
+  if (opts.hasTehake)  mkChart("#chartTehake",  { type: "bar", data: barData(buildByField(geo, "tehake", "—")), options: barOpts() });
+
+  if (opts.hasSante) {
+    const bySecSc = {};
+    sites.forEach(s => {
+      if (s.sgr === null || s.prevSante === null) return;
+      (bySecSc[s.secteur] = bySecSc[s.secteur] || []).push({ x: +(s.prevSante * 100).toFixed(0), y: +s.sgr.toFixed(2), code: s.code });
+    });
+    mkChart("#chartScatter", { type: "scatter",
+      data: { datasets: Object.keys(bySecSc).sort().map((sec, i) => ({
+        label: sec, data: bySecSc[sec], backgroundColor: PALETTE[i % PALETTE.length], pointRadius: 5, pointHoverRadius: 7 })) },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { min: 0, max: 100, grid: { color: "#e2e8f0" }, title: { display: true, text: "% de pesées avec signal sanitaire" } },
+          y: { grid: { color: "#e2e8f0" }, title: { display: true, text: "Taux moyen (%/j)" } } },
+        plugins: { legend: { labels: { boxWidth: 12 } },
+          tooltip: { callbacks: { label: c => `${c.raw.code} : taux ${c.raw.y} %/j — pression ${c.raw.x}%` } } } } });
+
+    const sSante = sites.filter(s => s.prevSante !== null).sort((a, b) => b.prevSante - a.prevSante);
+    mkChart("#chartSante", { type: "bar",
+      data: { labels: sSante.map(s => s.code),
+        datasets: [{ data: sSante.map(s => +(s.prevSante * 100).toFixed(0)),
+          backgroundColor: sSante.map(s => s.prevSante >= 0.5 ? COLORS.severe.hex : s.prevSante >= 0.2 ? COLORS.moderate.hex : COLORS.good.hex),
+          borderRadius: 6 }] },
+      options: barOpts("% des pesées") });
+  }
+}
+
+function santeCell(s) {
+  if (s.prevSante === null && s.efaMax === null) return "—";
+  const parts = [];
+  if (s.prevIce !== null && s.prevIce > 0) parts.push(`<span class="text-red-600">🧊 ${(s.prevIce * 100).toFixed(0)}%</span>`);
+  if (s.efaMax !== null && s.efaMax >= 1)
+    parts.push(`<span class="${s.efaMax >= 3 ? "text-red-600" : "text-amber-600"}">EFA ${s.efaMax}</span>`);
+  return parts.join(" ") || `<span class="text-emerald-600">Sain</span>`;
+}
+
+function renderTable(sites, tri) {
+  const sorted = sites.slice().sort((a, b) => {
+    switch (tri) {
+      case "sgr-asc":    return (a.sgr ?? Infinity) - (b.sgr ?? Infinity);
+      case "sgr-desc":   return (b.sgr ?? -Infinity) - (a.sgr ?? -Infinity);
+      case "survie-asc": return (a.survie ?? Infinity) - (b.survie ?? Infinity);
+      case "sante-desc": return (b.prevSante ?? -1) - (a.prevSante ?? -1);
+      case "recent":     return (b.lastDate?.getTime() ?? 0) - (a.lastDate?.getTime() ?? 0);
+      default:           return `${a.code} ${a.nom}`.localeCompare(`${b.code} ${b.nom}`);
+    }
+  });
+  document.querySelector("#tableCount").textContent = `(${sorted.length})`;
+  document.querySelector("#tableBody").innerHTML = sorted.map(s => {
+    const j = joursDepuis(s.lastDate);
+    const sv = s.survie;
+    const svC = sv === null ? COLORS.pending : survieColor(sv);
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-2.5 pr-3 font-semibold text-slate-900 whitespace-nowrap">${s.code} <span class="text-slate-500 font-normal">— ${s.nom}</span></td>
+      <td class="py-2.5 pr-3 text-slate-500">${s.secteur}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${s.varietes.join(", ") || "—"}</td>
+      <td class="py-2.5 pr-3">${badgeSgr(s.sgr)}</td>
+      <td class="py-2.5 pr-3 font-semibold ${sv === null ? "text-slate-400" : svC.text}">${sv === null ? "—" : sv.toFixed(0) + " %"}</td>
+      <td class="py-2.5 pr-3 ${s.pertes ? "text-amber-600" : "text-slate-500"}">${s.premierNb ? `${s.premierNb} → ${s.dernierNb}${s.pertes ? ` (−${s.pertes})` : ""}` : "—"}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${s.premierPoids ? `${s.premierPoids.toFixed(1)} → ${s.biomasse.toFixed(1)} kg` : "—"}</td>
+      <td class="py-2.5 pr-3 whitespace-nowrap">${santeCell(s)}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${s.cadence !== null ? `≈${Math.round(s.cadence)} j` : "—"}</td>
+      <td class="py-2.5 text-slate-500 whitespace-nowrap">${dotFraicheur(s.lastDate)}${s.lastDate ? `${fmtDate(s.lastDate)} <span class="text-slate-400">(${j} j)</span>` : "—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ========================================================================
+// BOOTSTRAP
+// ========================================================================
+let dernierSites = [];
+
+async function refresh(strict) {
+  const geo = await loadData(strict);
+  const sites = computeSites(geo);
+  const allRows = geo.features.flatMap(f => f.properties.rows || []);
+
+  const sgrGlobal = mean(sites.filter(s => s.sgr !== null).map(s => s.sgr));
+  const p0 = sites.reduce((a, s) => a + s.premierNb, 0), pn = sites.reduce((a, s) => a + s.dernierNb, 0);
+  const survieGlob = p0 > 0 ? 100 * pn / p0 : null;
+  const bioTot = sites.reduce((a, s) => a + s.biomasse, 0);
+  const bioDelta = sites.reduce((a, s) => a + s.deltaBio, 0);
+  const iceP = sites.reduce((a, s) => a + s.iceP, 0), iceN = sites.reduce((a, s) => a + s.iceN, 0);
+  const prevIceGlob = iceN ? iceP / iceN : null;
+
+  const hasPoids = sites.some(s => s.biomasse > 0);
+  const hasIce = iceN > 0;
+  const hasSante = allRows.some(r => r.sante && Object.values(r.sante)
+    .some(v => v === true || v === false || typeof v === "number"));
+  const hasVariete = allRows.some(r => (r.variete || "").trim());
+  const hasTehake = allRows.some(r => (r.tehake || "").trim());
+
+  const complets = allRows.filter(r => parseFloat(r.poids) > 0 && parseInt(r.nb, 10) > 0 && parseFrDate(r.date_pesage)).length;
+  const completude = allRows.length ? 100 * complets / allRows.length : null;
+
+  const statuts = { strong: 0, good: 0, low: 0, moderate: 0, severe: 0, pending: 0 };
+  sites.forEach(s => statuts[statutKey(s.sgr)]++);
+
+  const sitesNeg = sites.filter(s => s.sgr !== null && s.sgr < 0).sort((a, b) => a.sgr - b.sgr);
+  const sitesRetard = sites.filter(s => !s.lastDate || joursDepuis(s.lastDate) > CONFIG.SEUIL_ALERTE_JOURS);
+  const sitesSante = sites.filter(s => (s.prevIce !== null && s.prevIce > 0) || (s.efaMax !== null && s.efaMax >= 3));
+  const dates = sites.map(s => s.lastDate).filter(Boolean);
+  const derniere = dates.length ? new Date(Math.max(...dates)) : null;
+  const corr = pearson(sites.filter(s => s.sgr !== null && s.prevSante !== null).map(s => [s.prevSante * 100, s.sgr]));
+
+  dernierSites = sites;
+  renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce);
+  renderAlerts(sitesNeg, sitesRetard, sitesSante);
+  renderCharts(sites, geo, statuts, { hasVariete, hasTehake, hasSante });
+  renderTable(sites, document.querySelector("#sortSelect").value);
+
+  document.querySelector("#panelVariete").classList.toggle("hidden", !hasVariete);
+  document.querySelector("#panelTehake").classList.toggle("hidden", !hasTehake);
+  document.querySelector("#secSante").classList.toggle("hidden", !hasSante);
+  document.querySelector("#corrText").textContent = corr === null ? ""
+    : `Corrélation pression sanitaire ↔ croissance : r = ${corr.toFixed(2)} — ${
+        corr < -0.4 ? "les sites malades poussent moins ✅ cohérent"
+        : corr > 0.4 ? "lien positif inattendu — à investiguer"
+        : "lien faible sur ces données"}`;
+
+  document.querySelector("#updatedAt").textContent = new Date().toLocaleTimeString("fr-FR");
+}
+
+document.querySelector("#sortSelect").addEventListener("change", e => renderTable(dernierSites, e.target.value));
+
+refresh(false);
+setInterval(() => {
+  if (!CONFIG.API_URL.includes("script.google.com")) return;
+  refresh(true).catch(e => console.warn("Rafraîchissement échoué :", e.message));
+}, CONFIG.REFRESH_MS);
+</script>
+</body>
+</html>

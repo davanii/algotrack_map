@@ -15,6 +15,9 @@
   ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
   .panel { background: rgba(255,255,255,.95); border: 1px solid #e2e8f0; border-radius: .75rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
   .kpi-value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+  .png-btn { font-size: 10px; padding: 2px 7px; border-radius: 6px;
+             background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b; }
+  .png-btn:hover { color: #059669; border-color: #a7f3d0; }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans">
@@ -37,49 +40,127 @@
 
 <main class="max-w-7xl mx-auto px-4 pt-20 pb-10 space-y-4">
 
+  <!-- ============ FILTRES ============ -->
+  <section class="panel p-3 flex items-center gap-3 flex-wrap">
+    <span class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Filtres</span>
+    <select id="secteurFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
+      <option value="all">Secteur : Tous</option>
+    </select>
+    <select id="periodeFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
+      <option value="all">Période : Tout</option>
+      <option value="90">Période : 3 derniers mois</option>
+      <option value="182">Période : 6 derniers mois</option>
+      <option value="365">Période : 12 derniers mois</option>
+    </select>
+    <span class="text-[11px] text-slate-400">— la période s'applique aux taux et graphiques (survie & biomasse restent cumulatives)</span>
+  </section>
+
   <!-- ============ KPI ============ -->
   <section id="kpiRow" class="grid grid-cols-2 md:grid-cols-4 gap-3"></section>
 
   <!-- ============ ALERTES ============ -->
   <section id="alertBox" class="hidden space-y-2"></section>
 
-  <!-- ============ GRAPHIQUES : évolution + statuts ============ -->
+  <!-- ============ ÉVOLUTION + STATUTS ============ -->
   <section class="grid lg:grid-cols-5 gap-4">
     <div class="panel p-4 lg:col-span-3">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Évolution mensuelle du taux de croissance (%/jour)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Évolution mensuelle du taux de croissance (%/jour)</h2>
+        <button class="png-btn" data-chart="#chartEvolution" data-name="evolution-mensuelle">PNG</button>
+      </div>
       <div class="h-64"><canvas id="chartEvolution"></canvas></div>
     </div>
     <div class="panel p-4 lg:col-span-2">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Répartition des sites par statut</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Répartition des sites par statut</h2>
+        <button class="png-btn" data-chart="#chartStatuts" data-name="statuts">PNG</button>
+      </div>
       <div class="h-64"><canvas id="chartStatuts"></canvas></div>
     </div>
   </section>
 
-  <!-- ============ GRAPHIQUES : segments ============ -->
+  <!-- ============ SEGMENTS : secteur / zone / variété / matériel / type / tehake ============ -->
   <section class="grid md:grid-cols-3 gap-4">
     <div class="panel p-4">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par secteur (%/j)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Taux par secteur (%/j)</h2>
+        <button class="png-btn" data-chart="#chartSecteurs" data-name="par-secteur">PNG</button>
+      </div>
       <div class="h-56"><canvas id="chartSecteurs"></canvas></div>
     </div>
+    <div class="panel p-4" id="panelZone">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Taux par zone (%/j)</h2>
+        <button class="png-btn" data-chart="#chartZones" data-name="par-zone">PNG</button>
+      </div>
+      <div class="h-56"><canvas id="chartZones"></canvas></div>
+    </div>
     <div class="panel p-4" id="panelVariete">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par variété (%/j)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Taux par variété (%/j)</h2>
+        <button class="png-btn" data-chart="#chartVariete" data-name="par-variete">PNG</button>
+      </div>
       <div class="h-56"><canvas id="chartVariete"></canvas></div>
     </div>
+    <div class="panel p-4" id="panelMateriel">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Corde vs Tube-net (%/j)</h2>
+        <button class="png-btn" data-chart="#chartMateriel" data-name="par-materiel">PNG</button>
+      </div>
+      <div class="h-56"><canvas id="chartMateriel"></canvas></div>
+    </div>
+    <div class="panel p-4" id="panelType">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">OB vs LL — type de culture (%/j)</h2>
+        <button class="png-btn" data-chart="#chartType" data-name="par-type">PNG</button>
+      </div>
+      <div class="h-56"><canvas id="chartType"></canvas></div>
+    </div>
     <div class="panel p-4" id="panelTehake">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Taux de croissance par tehake (%/j)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Taux par tehake (%/j)</h2>
+        <button class="png-btn" data-chart="#chartTehake" data-name="par-tehake">PNG</button>
+      </div>
       <div class="h-56"><canvas id="chartTehake"></canvas></div>
     </div>
   </section>
 
-  <!-- ============ GRAPHIQUES : santé ============ -->
+  <!-- ============ RÉCOLTES ============ -->
+  <section class="panel p-4" id="panelRecoltes">
+    <h2 class="text-sm font-semibold text-slate-900 mb-3">🌾 Récoltes — cycles terminés (P0 → PR)</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="text-[10px] uppercase text-slate-500 tracking-wide border-b border-slate-200">
+            <th class="py-2 pr-3 font-medium">Site</th>
+            <th class="py-2 pr-3 font-medium">Ligne</th>
+            <th class="py-2 pr-3 font-medium">Variété</th>
+            <th class="py-2 pr-3 font-medium">Durée</th>
+            <th class="py-2 pr-3 font-medium">Planté</th>
+            <th class="py-2 pr-3 font-medium">Récolté</th>
+            <th class="py-2 font-medium">Rendement</th>
+          </tr>
+        </thead>
+        <tbody id="recoltesBody" class="text-xs"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ SANTÉ ============ -->
   <section class="grid lg:grid-cols-2 gap-4" id="secSante">
     <div class="panel p-4">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Pression sanitaire vs croissance</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Pression sanitaire vs croissance</h2>
+        <button class="png-btn" data-chart="#chartScatter" data-name="sante-croissance">PNG</button>
+      </div>
       <div class="h-72"><canvas id="chartScatter"></canvas></div>
       <p id="corrText" class="text-[11px] text-slate-500 mt-2"></p>
     </div>
     <div class="panel p-4">
-      <h2 class="text-sm font-semibold text-slate-900 mb-3">Pression sanitaire par site (% de pesées avec signal)</h2>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">Pression sanitaire par site (% de pesées avec signal)</h2>
+        <button class="png-btn" data-chart="#chartSante" data-name="pression-sanitaire">PNG</button>
+      </div>
       <div class="h-72"><canvas id="chartSante"></canvas></div>
     </div>
   </section>
@@ -88,14 +169,17 @@
   <section class="panel p-4">
     <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
       <h2 class="text-sm font-semibold text-slate-900">Sites <span id="tableCount" class="text-slate-400 font-normal"></span></h2>
-      <select id="sortSelect" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
-        <option value="sgr-asc">Trier : taux croissant (à surveiller d'abord)</option>
-        <option value="sgr-desc">Trier : taux décroissant</option>
-        <option value="survie-asc">Trier : survie la plus faible</option>
-        <option value="sante-desc">Trier : pression sanitaire la plus forte</option>
-        <option value="recent">Trier : mesure la plus récente</option>
-        <option value="nom">Trier : nom du site</option>
-      </select>
+      <div class="flex items-center gap-2">
+        <select id="sortSelect" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
+          <option value="sgr-asc">Trier : taux croissant (à surveiller d'abord)</option>
+          <option value="sgr-desc">Trier : taux décroissant</option>
+          <option value="survie-asc">Trier : survie la plus faible</option>
+          <option value="sante-desc">Trier : pression sanitaire la plus forte</option>
+          <option value="recent">Trier : mesure la plus récente</option>
+          <option value="nom">Trier : nom du site</option>
+        </select>
+        <button id="csvBtn" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition">⬇️ CSV</button>
+      </div>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-left">
@@ -123,17 +207,18 @@
 
 <script>
 // ========================================================================
-// CONFIG — ⚠️ 1 valeur à personnaliser : API_URL
+// CONFIG
 // ========================================================================
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbyWWD8fqHMJkwwzU_8l3A5hq4GtkaDnEvwlSEZbSfbP3R3tz-b1E_SW9e1UnLwatr6rZg/exec",   // même URL /exec que la carte
+  API_URL: "https://script.google.com/macros/s/AKfycbzBxW6fvNAbJTpN44R-T0S1R8BJKul3n42Y24xbGR-LyK28afGCOQ46XBwHi22rnTyYSg/exec",   // même URL /exec que la carte
   REFRESH_MS: 5 * 60 * 1000,
   SEUIL_FRAICHE_JOURS: 15,
-  SEUIL_ALERTE_JOURS: 30
+  SEUIL_ALERTE_JOURS: 30,
+  MIN_N_MOIS: 3        // nb d'intervalles mini pour qu'un mois soit classé
 };
 
 // ========================================================================
-// RÈGLE DES COULEURS — identique à la carte (5 niveaux + en attente)
+// RÈGLE DES COULEURS — 5 niveaux + en attente (identique à la carte)
 // ========================================================================
 const COLORS = {
   pending:  { hex: "#94a3b8", tw: "bg-slate-400",  text: "text-slate-500", txt: "#0f172a" },
@@ -187,7 +272,6 @@ function fmtDate(d) {
 function fmtMois(ym) { const [y, m] = ym.split("-"); return `${MOIS[+m - 1]} ${y.slice(2)}`; }
 function joursDepuis(d) { return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / 864e5)) : null; }
 function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }
-
 function pearson(pairs) {
   const n = pairs.length;
   if (n < 3) return null;
@@ -196,7 +280,6 @@ function pearson(pairs) {
   pairs.forEach(([x, y]) => { num += (x - mx) * (y - my); dx += (x - mx) ** 2; dy += (y - my) ** 2; });
   return (dx && dy) ? num / Math.sqrt(dx * dy) : null;
 }
-
 function survieColor(v) { return v >= 80 ? COLORS.good : v >= 50 ? COLORS.low : COLORS.moderate; }
 
 function badgeSgr(sgr) {
@@ -218,23 +301,22 @@ function setStatus(isLive, text) {
 }
 
 // ========================================================================
-// DONNEES DE SECOURS — 6 sites = 6 niveaux (santé au format v6)
+// MOCK — 6 sites, avec zone/matériel/type + une récolte PR (TAM)
 // ========================================================================
 function mkSite(code, nom, secteur, lon, lat, txcrs, opts = {}) {
   const rows = [];
-  const base = new Date(); base.setDate(base.getDate() - (txcrs.length + 1) * 15);
-  const mk = (i, d, txcr, w, nb) => ({
+  const base = new Date(); base.setDate(base.getDate() - ((txcrs.length + (opts.pr ? 1 : 0)) + 1) * 15);
+  const mk = (i, d, txcr, w, nb, isPR) => ({
     ligne_test: "LT 1 (Tehake THK5)" + (opts.variete ? " · " + opts.variete : ""),
-    tehake: String(opts.tehake || "THK5"),
-    pesage: "P" + i, date_pesage: fmtDate(d),
-    duree: i === 0 ? "" : "15", txcr_calc: txcr,
+    tehake: "THK5", pesage: isPR ? "PR" : "P" + i,
+    date_pesage: fmtDate(d), duree: i === 0 ? "" : "15", txcr_calc: txcr,
     nb, poids: String(w),
     variete: opts.variete || "Sacol (Cottonii)",
+    zone: opts.zone || "Est", materiel: opts.materiel || "Corde", type_culture: opts.type || "OB",
     sante: {
       efa: (opts.efa && i >= Math.ceil(txcrs.length / 2)) ? opts.efa : 0,
       iceice: opts.iceice ? (i === 1 ? true : false) : false,
-      broutage: false,
-      lomodraty: opts.lomodraty && i === 2 ? true : false
+      broutage: false, lomodraty: opts.lomodraty && i === 2 ? true : false
     }
   });
   let w = 1.8, nb = 30;
@@ -244,16 +326,17 @@ function mkSite(code, nom, secteur, lon, lat, txcrs, opts = {}) {
     if (opts.perte && i === 1) nb--;
     rows.push(mk(i + 1, new Date(base.getTime() + (i + 1) * 15 * 864e5), (v >= 0 ? "+" : "") + v.toFixed(2), +w.toFixed(2), nb));
   });
+  if (opts.pr) rows.push(mk(txcrs.length + 1, new Date(base.getTime() + (txcrs.length + 1) * 15 * 864e5), "*", +w.toFixed(2), nb, true));
   return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
-    properties: { site_id: code, code_site: code, site_nom: nom, secteur, tche: "—", tehake: String(opts.tehake || "THK5"), rows } };
+    properties: { site_id: code, code_site: code, site_nom: nom, secteur, tche: "—", tehake: "THK5", rows } };
 }
 const MOCK_GEOJSON = { type: "FeatureCollection", features: [
-  mkSite("TAM", "Tambalang Nord", "BTL", 43.760, -23.310, [4.6, 5.1]),
-  mkSite("BLM", "Ambolimoke", "ADK", 43.689, -23.354, [1.8, 2.1, 1.9], { perte: true }),
-  mkSite("BVK", "Belavenoky", "BDA", 43.655, -23.402, [0.3, 0.45], { variete: "Tambalang" }),
-  mkSite("APL", "Ampasilava", "ADK", 43.672, -23.381, [-0.4, -0.2]),
-  mkSite("TSM", "Antsatsamoroy", "MKN", 43.718, -23.390, [-2.4, -1.8], { iceice: true, efa: 3, lomodraty: true }),
-  mkSite("TSG", "Tserananangy", "MKN", 43.701, -23.365, [])
+  mkSite("TAM", "Tambalang Nord", "BTL", 43.760, -23.310, [4.6, 5.1], { zone: "Nord", pr: true }),
+  mkSite("BLM", "Ambolimoke", "ADK", 43.689, -23.354, [1.8, 2.1, 1.9], { zone: "Sud", perte: true }),
+  mkSite("BVK", "Belavenoky", "BDA", 43.655, -23.402, [0.3, 0.45], { zone: "Est", materiel: "Tube-net", type: "LL", variete: "Tambalang" }),
+  mkSite("APL", "Ampasilava", "ADK", 43.672, -23.381, [-0.4, -0.2], { zone: "Ouest", materiel: "Tube-net" }),
+  mkSite("TSM", "Antsatsamoroy", "MKN", 43.718, -23.390, [-2.4, -1.8], { zone: "Nord", iceice: true, efa: 3, lomodraty: true }),
+  mkSite("TSG", "Tserananangy", "MKN", 43.701, -23.365, [], { zone: "Centre" })
 ]};
 
 // ========================================================================
@@ -285,12 +368,16 @@ async function loadData(strict) {
 }
 
 // ========================================================================
-// AGRÉGATION PAR SITE (santé au format v6 : broutage / lomodraty)
+// AGRÉGATION PAR SITE
+// (rowsF = pesées filtrées par période pour le taux ; rows complètes pour le cumul)
 // ========================================================================
-function computeSites(geo) {
+function computeSites(geo, dateMin) {
   return geo.features.map(f => {
     const p = f.properties, rows = p.rows || [];
-    const sgrVals = rows.map(r => parseTxcr(r.txcr_calc)).filter(v => v !== null);
+    const inPeriod = r => { if (!dateMin) return true; const d = parseFrDate(r.date_pesage); return d && d >= dateMin; };
+    const rowsF = dateMin ? rows.filter(inPeriod) : rows;
+
+    const sgrVals = rowsF.map(r => parseTxcr(r.txcr_calc)).filter(v => v !== null);
     const dates = rows.map(r => parseFrDate(r.date_pesage)).filter(Boolean).sort((a, b) => a - b);
     const lastDate = dates.length ? dates[dates.length - 1] : null;
 
@@ -320,7 +407,7 @@ function computeSites(geo) {
     let cadence = null;
     if (dates.length >= 2) {
       let sum = 0;
-      for (let i = 1; i < dates.length; i++) sum += (dates[i] - dates[i - 1]) / 864e5;
+      for (let k = 1; k < dates.length; k++) sum += (dates[k] - dates[k - 1]) / 864e5;
       cadence = sum / (dates.length - 1);
     }
 
@@ -339,13 +426,46 @@ function computeSites(geo) {
   });
 }
 
-function buildEvolution(geo) {
+// ========================================================================
+// RÉCOLTES — cycles terminés par une PR
+// ========================================================================
+function computeRecoltes(geo) {
+  const out = [];
+  geo.features.forEach(f => {
+    const p = f.properties, byLine = {};
+    (p.rows || []).forEach(r => (byLine[r.ligne_test] = byLine[r.ligne_test] || []).push(r));
+    Object.values(byLine).forEach(rs => {
+      const sorted = rs.slice().sort((a, b) =>
+        (parseFrDate(a.date_pesage)?.getTime() ?? 0) - (parseFrDate(b.date_pesage)?.getTime() ?? 0));
+      const last = sorted[sorted.length - 1];
+      if (!/^pr/.test(String(last.pesage || "").trim().toLowerCase())) return;
+      const first = sorted[0];
+      const p0 = parseFloat(first.poids), pr = parseFloat(last.poids);
+      if (!(p0 > 0) || !(pr > 0)) return;
+      const d0 = parseFrDate(first.date_pesage), d1 = parseFrDate(last.date_pesage);
+      out.push({
+        site: `${p.site_id} — ${p.site_nom}`, ligne: last.ligne_test,
+        variete: (last.variete || "").replace(/\s*\(.*\)\s*/, ""),
+        d0, d1, duree: (d0 && d1) ? Math.round((d1 - d0) / 864e5) : null,
+        plante: p0, recolteKg: pr, rendement: pr / p0
+      });
+    });
+  });
+  out.sort((a, b) => (b.d1?.getTime() ?? 0) - (a.d1?.getTime() ?? 0));
+  return out;
+}
+
+// ========================================================================
+// SÉRIES : évolution, par champ, meilleurs/moins bons mois
+// ========================================================================
+function buildEvolution(geo, dateMin) {
   const acc = {};
   geo.features.forEach(f => {
     const sec = f.properties.secteur || "—";
     (f.properties.rows || []).forEach(r => {
       const v = parseTxcr(r.txcr_calc), d = parseFrDate(r.date_pesage);
       if (v === null || !d) return;
+      if (dateMin && d < dateMin) return;
       const mois = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
       ((acc[sec] = acc[sec] || {})[mois] = acc[sec][mois] || []).push(v);
     });
@@ -366,27 +486,41 @@ function buildEvolution(geo) {
   return { labels: moisList.map(fmtMois), datasets };
 }
 
-function buildByField(geo, field, emptyLabel) {
+function buildByField(geo, field, emptyLabel, dateMin) {
   const acc = {};
   geo.features.forEach(f => (f.properties.rows || []).forEach(r => {
     const v = parseTxcr(r.txcr_calc);
     if (v === null) return;
+    if (dateMin) { const d = parseFrDate(r.date_pesage); if (!d || d < dateMin) return; }
     const k = String(r[field] || "").trim() || emptyLabel;
     (acc[k] = acc[k] || []).push(v);
   }));
   const keys = Object.keys(acc).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  return {
-    labels: keys,
-    values: keys.map(k => mean(acc[k])),
-    counts: keys.map(k => acc[k].length)
-  };
+  return { labels: keys, values: keys.map(k => mean(acc[k])), counts: keys.map(k => acc[k].length) };
+}
+
+function computeMonthStats(geo, dateMin, minN) {
+  const acc = {};
+  geo.features.forEach(f => (f.properties.rows || []).forEach(r => {
+    const v = parseTxcr(r.txcr_calc), d = parseFrDate(r.date_pesage);
+    if (v === null || !d) return;
+    if (dateMin && d < dateMin) return;
+    const ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    (acc[ym] = acc[ym] || []).push(v);
+  }));
+  const months = Object.keys(acc)
+    .map(ym => ({ ym, v: mean(acc[ym]), n: acc[ym].length }))
+    .filter(m => m.v !== null && m.n >= minN);
+  if (!months.length) return { best: null, worst: null };
+  const best = months.reduce((a, b) => (b.v > a.v ? b : a));
+  const worst = months.reduce((a, b) => (b.v < a.v ? b : a));
+  return { best, worst, nbMois: months.length };
 }
 
 // ========================================================================
 // RENDU
 // ========================================================================
-function renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce) {
-  const t2 = (sgrGlobal !== null && sgrGlobal > 0) ? Math.log(2) / Math.log(1 + sgrGlobal / 100) : null;
+function renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce, recoltes, mois) {
   const survieC = survieGlob === null ? COLORS.pending : survieColor(survieGlob);
   const iceC = prevIceGlob === null ? COLORS.pending : prevIceGlob > 0.2 ? COLORS.severe : prevIceGlob > 0 ? COLORS.moderate : COLORS.good;
   const compC = completude === null ? COLORS.pending : completude >= 90 ? COLORS.good : completude >= 70 ? COLORS.low : COLORS.moderate;
@@ -395,7 +529,6 @@ function renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob,
     { label: "Sites suivis", value: sites.length, sub: `${sites.reduce((a, s) => a + s.lignes, 0)} lignes test` },
     { label: "Taux moyen global", value: sgrGlobal === null ? "—" : `${sgrGlobal > 0 ? "+" : ""}${sgrGlobal.toFixed(2)} %/j`,
       valueColor: sgrGlobal === null ? "" : colorFor(sgrGlobal).text, sub: "tous intervalles confondus" },
-    { label: "Temps de doublement", value: t2 === null ? "—" : `${t2.toFixed(0)} j`, sub: "au rythme moyen actuel" },
     { label: "Survie des boutures", value: survieGlob === null ? "—" : `${survieGlob.toFixed(0)} %`,
       valueColor: survieGlob === null ? "" : survieC.text, sub: "P0 → dernier pesage" },
     ...(hasPoids ? [{ label: "Biomasse gagnée", value: `${bioDelta >= 0 ? "+" : ""}${bioDelta.toFixed(1)} kg`,
@@ -405,7 +538,13 @@ function renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob,
     { label: "Sites à taux négatif", value: sitesNeg.length, valueColor: sitesNeg.length ? "text-red-600" : "text-slate-800",
       sub: sitesNeg.length ? sitesNeg.map(s => s.code).join(", ") : "aucun 🎉" },
     { label: "Complétude des données", value: completude === null ? "—" : `${completude.toFixed(0)} %`,
-      valueColor: compC.text, sub: "poids + boutures + date" }
+      valueColor: compC.text, sub: "poids + boutures + date" },
+    ...(recoltes.length ? [{ label: "Biomasse récoltée", value: `${recoltes.reduce((a, r) => a + r.recolteKg, 0).toFixed(0)} kg`,
+      valueColor: "text-emerald-600", sub: `${recoltes.length} cycle(s) terminé(s) (PR)` }] : []),
+    ...(mois.best ? [{ label: "🏆 Meilleur mois", value: `${mois.best.v > 0 ? "+" : ""}${mois.best.v.toFixed(2)} %/j`,
+      valueColor: colorFor(mois.best.v).text, sub: `${fmtMois(mois.best.ym)} · n=${mois.best.n}` }] : []),
+    ...(mois.worst && mois.nbMois >= 2 ? [{ label: "📉 Mois le + faible", value: `${mois.worst.v > 0 ? "+" : ""}${mois.worst.v.toFixed(2)} %/j`,
+      valueColor: colorFor(mois.worst.v).text, sub: `${fmtMois(mois.worst.ym)} · n=${mois.worst.n}` }] : [])
   ];
   document.querySelector("#kpiRow").innerHTML = kpis.map(k => `
     <div class="panel p-4">
@@ -456,18 +595,16 @@ function renderCharts(sites, geo, statuts, opts) {
   Chart.defaults.borderColor = "#e2e8f0";
   Chart.defaults.font.family = "ui-sans-serif, system-ui";
 
-  mkChart("#chartEvolution", { type: "line", data: buildEvolution(geo),
+  mkChart("#chartEvolution", { type: "line", data: buildEvolution(geo, opts.dateMin),
     options: { responsive: true, maintainAspectRatio: false,
       scales: { y: { grid: { color: "#e2e8f0" } }, x: { grid: { display: false } } },
       plugins: { legend: { labels: { boxWidth: 12 } } } } });
 
   mkChart("#chartStatuts", { type: "doughnut",
-    data: {
-      labels: STATUT_ORDER.map(k => STATUT_LABELS[k]),
+    data: { labels: STATUT_ORDER.map(k => STATUT_LABELS[k]),
       datasets: [{ data: STATUT_ORDER.map(k => statuts[k]),
         backgroundColor: STATUT_ORDER.map(k => COLORS[k].hex),
-        borderColor: "#ffffff", borderWidth: 3 }]
-    },
+        borderColor: "#ffffff", borderWidth: 3 }] },
     options: { responsive: true, maintainAspectRatio: false, cutout: "62%",
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10 } } } } });
 
@@ -479,8 +616,11 @@ function renderCharts(sites, geo, statuts, opts) {
       backgroundColor: secs.map(sec => colorFor(mean(bySec[sec])).hex), borderRadius: 6 }] },
     options: barOpts() });
 
-  if (opts.hasVariete) mkChart("#chartVariete", { type: "bar", data: barData(buildByField(geo, "variete", "Non renseignée")), options: barOpts() });
-  if (opts.hasTehake)  mkChart("#chartTehake",  { type: "bar", data: barData(buildByField(geo, "tehake", "—")), options: barOpts() });
+  if (opts.hasZone)     mkChart("#chartZones",    { type: "bar", data: barData(buildByField(geo, "zone", "—", opts.dateMin)), options: barOpts() });
+  if (opts.hasVariete)  mkChart("#chartVariete",  { type: "bar", data: barData(buildByField(geo, "variete", "Non renseignée", opts.dateMin)), options: barOpts() });
+  if (opts.hasMateriel) mkChart("#chartMateriel", { type: "bar", data: barData(buildByField(geo, "materiel", "—", opts.dateMin)), options: barOpts() });
+  if (opts.hasType)     mkChart("#chartType",     { type: "bar", data: barData(buildByField(geo, "type_culture", "—", opts.dateMin)), options: barOpts() });
+  if (opts.hasTehake)   mkChart("#chartTehake",   { type: "bar", data: barData(buildByField(geo, "tehake", "—", opts.dateMin)), options: barOpts() });
 
   if (opts.hasSante) {
     const bySecSc = {};
@@ -517,6 +657,21 @@ function santeCell(s) {
   return parts.join(" ") || `<span class="text-emerald-600">Sain</span>`;
 }
 
+function renderRecoltes(recoltes) {
+  document.querySelector("#recoltesBody").innerHTML = recoltes.map(r => {
+    const c = r.rendement >= 2 ? "text-emerald-600 font-bold" : r.rendement < 1 ? "text-red-600" : "text-slate-700";
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+      <td class="py-2.5 pr-3 font-semibold text-slate-900 whitespace-nowrap">${r.site}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${r.ligne}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${r.variete || "—"}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${r.duree !== null ? r.duree + " j" : "—"}</td>
+      <td class="py-2.5 pr-3 text-slate-500">${r.plante.toFixed(1)} kg</td>
+      <td class="py-2.5 pr-3 text-slate-500">${r.recolteKg.toFixed(1)} kg</td>
+      <td class="py-2.5 ${c}">× ${r.rendement.toFixed(2)}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderTable(sites, tri) {
   const sorted = sites.slice().sort((a, b) => {
     switch (tri) {
@@ -549,13 +704,80 @@ function renderTable(sites, tri) {
 }
 
 // ========================================================================
-// BOOTSTRAP
+// EXPORTS : PNG (graphiques) et CSV (tableau des sites)
 // ========================================================================
+function exportPNG(chartSel, name) {
+  const c = charts[chartSel];
+  if (!c) return;
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement("canvas");
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0);
+    const a = document.createElement("a");
+    a.href = cv.toDataURL("image/png");
+    a.download = `algotrack-${name}.png`;
+    a.click();
+  };
+  img.src = c.toBase64Image();
+}
+
+function exportCSV(sites) {
+  const head = ["Code", "Nom", "Secteur", "Variétés", "Taux moyen (%/j)", "Intervalles", "Survie (%)",
+    "Boutures (P0->fin)", "Pertes", "Biomasse (kg)", "Ice-ice (%)", "EFA max", "Cadence (j)", "Dernière mesure"];
+  const lines = sites.map(s => [
+    s.code, s.nom, s.secteur, s.varietes.join(" / "),
+    s.sgr === null ? "" : s.sgr.toFixed(2),
+    s.nbIntervalles || "",
+    s.survie === null ? "" : s.survie.toFixed(0),
+    s.premierNb ? `${s.premierNb}->${s.dernierNb}` : "",
+    s.pertes || "",
+    s.biomasse ? s.biomasse.toFixed(1) : "",
+    s.prevIce !== null ? (s.prevIce * 100).toFixed(0) : "",
+    s.efaMax !== null ? s.efaMax : "",
+    s.cadence !== null ? Math.round(s.cadence) : "",
+    s.lastDate ? fmtDate(s.lastDate) : ""
+  ].map(v => { v = String(v); return (v.includes(";") || v.includes('"')) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(";"));
+  const blob = new Blob(["\uFEFF" + head.join(";") + "\n" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "algotrack-sites.csv";
+  a.click();
+}
+
+// ========================================================================
+// PIPELINE : chargement → filtres → rendu
+// ========================================================================
+let dernierGeoFull = null;
 let dernierSites = [];
 
-async function refresh(strict) {
-  const geo = await loadData(strict);
-  const sites = computeSites(geo);
+function periodDateMin() {
+  const v = document.querySelector("#periodeFilter").value;
+  if (v === "all") return null;
+  const d = new Date(); d.setDate(d.getDate() - parseInt(v, 10));
+  return d;
+}
+
+function populateSecteurFilter() {
+  const $sel = document.querySelector("#secteurFilter");
+  const current = $sel.value;
+  const secteurs = [...new Set((dernierGeoFull?.features || []).map(f => f.properties.secteur || "—"))].sort();
+  $sel.innerHTML = '<option value="all">Secteur : Tous</option>' +
+    secteurs.map(s => `<option value="${s}">Secteur : ${s}</option>`).join("");
+  if (secteurs.includes(current)) $sel.value = current;
+}
+
+function renderAll() {
+  if (!dernierGeoFull) return;
+  const sec = document.querySelector("#secteurFilter").value;
+  const dateMin = periodDateMin();
+  const geo = sec === "all" ? dernierGeoFull
+    : { ...dernierGeoFull, features: dernierGeoFull.features.filter(f => (f.properties.secteur || "—") === sec) };
+
+  const sites = computeSites(geo, dateMin);
   const allRows = geo.features.flatMap(f => f.properties.rows || []);
 
   const sgrGlobal = mean(sites.filter(s => s.sgr !== null).map(s => s.sgr));
@@ -570,8 +792,15 @@ async function refresh(strict) {
   const hasIce = iceN > 0;
   const hasSante = allRows.some(r => r.sante && Object.values(r.sante)
     .some(v => v === true || v === false || typeof v === "number"));
-  const hasVariete = allRows.some(r => (r.variete || "").trim());
-  const hasTehake = allRows.some(r => (r.tehake || "").trim());
+  const opts = {
+    dateMin,
+    hasSante,
+    hasVariete:  allRows.some(r => (r.variete || "").trim()),
+    hasTehake:   allRows.some(r => (r.tehake || "").trim()),
+    hasZone:     allRows.some(r => (r.zone || "").trim()),
+    hasMateriel: allRows.some(r => (r.materiel || "").trim()),
+    hasType:     allRows.some(r => (r.type_culture || "").trim())
+  };
 
   const complets = allRows.filter(r => parseFloat(r.poids) > 0 && parseInt(r.nb, 10) > 0 && parseFrDate(r.date_pesage)).length;
   const completude = allRows.length ? 100 * complets / allRows.length : null;
@@ -582,18 +811,23 @@ async function refresh(strict) {
   const sitesNeg = sites.filter(s => s.sgr !== null && s.sgr < 0).sort((a, b) => a.sgr - b.sgr);
   const sitesRetard = sites.filter(s => !s.lastDate || joursDepuis(s.lastDate) > CONFIG.SEUIL_ALERTE_JOURS);
   const sitesSante = sites.filter(s => (s.prevIce !== null && s.prevIce > 0) || (s.efaMax !== null && s.efaMax >= 3));
-  const dates = sites.map(s => s.lastDate).filter(Boolean);
-  const derniere = dates.length ? new Date(Math.max(...dates)) : null;
+  const recoltes = computeRecoltes(geo);
+  const mois = computeMonthStats(geo, dateMin, CONFIG.MIN_N_MOIS);
   const corr = pearson(sites.filter(s => s.sgr !== null && s.prevSante !== null).map(s => [s.prevSante * 100, s.sgr]));
 
   dernierSites = sites;
-  renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce);
+  renderKpis(sites, sgrGlobal, survieGlob, bioTot, bioDelta, prevIceGlob, sitesNeg, completude, hasPoids, hasIce, recoltes, mois);
   renderAlerts(sitesNeg, sitesRetard, sitesSante);
-  renderCharts(sites, geo, statuts, { hasVariete, hasTehake, hasSante });
+  renderCharts(sites, geo, statuts, opts);
+  renderRecoltes(recoltes);
   renderTable(sites, document.querySelector("#sortSelect").value);
 
-  document.querySelector("#panelVariete").classList.toggle("hidden", !hasVariete);
-  document.querySelector("#panelTehake").classList.toggle("hidden", !hasTehake);
+  document.querySelector("#panelVariete").classList.toggle("hidden", !opts.hasVariete);
+  document.querySelector("#panelTehake").classList.toggle("hidden", !opts.hasTehake);
+  document.querySelector("#panelZone").classList.toggle("hidden", !opts.hasZone);
+  document.querySelector("#panelMateriel").classList.toggle("hidden", !opts.hasMateriel);
+  document.querySelector("#panelType").classList.toggle("hidden", !opts.hasType);
+  document.querySelector("#panelRecoltes").classList.toggle("hidden", recoltes.length === 0);
   document.querySelector("#secSante").classList.toggle("hidden", !hasSante);
   document.querySelector("#corrText").textContent = corr === null ? ""
     : `Corrélation pression sanitaire ↔ croissance : r = ${corr.toFixed(2)} — ${
@@ -604,8 +838,23 @@ async function refresh(strict) {
   document.querySelector("#updatedAt").textContent = new Date().toLocaleTimeString("fr-FR");
 }
 
-document.querySelector("#sortSelect").addEventListener("change", e => renderTable(dernierSites, e.target.value));
+async function refresh(strict) {
+  dernierGeoFull = await loadData(strict);
+  populateSecteurFilter();
+  renderAll();
+}
 
+// ---- Événements
+document.querySelector("#sortSelect").addEventListener("change", e => renderTable(dernierSites, e.target.value));
+document.querySelector("#secteurFilter").addEventListener("change", renderAll);
+document.querySelector("#periodeFilter").addEventListener("change", renderAll);
+document.querySelector("#csvBtn").addEventListener("click", () => exportCSV(dernierSites));
+document.addEventListener("click", e => {
+  const b = e.target.closest(".png-btn");
+  if (b) exportPNG(b.dataset.chart, b.dataset.name);
+});
+
+// ---- Bootstrap + refresh auto
 refresh(false);
 setInterval(() => {
   if (!CONFIG.API_URL.includes("script.google.com")) return;

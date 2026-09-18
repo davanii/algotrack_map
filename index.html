@@ -27,6 +27,15 @@
   table.interval-table td, table.interval-table th {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .cycle-step {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; padding: 2px 6px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; border: 1px solid;
+  }
+  .cycle-step.current { background: #059669; border-color: #059669; color: #fff; }
+  .cycle-step.reached { background: #d1fae5; border-color: #6ee7b7; color: #047857; }
+  .cycle-step.future  { background: #fff; border-color: #e2e8f0; color: #cbd5e1; }
+  .cycle-link { color: #cbd5e1; font-size: 10px; }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans overflow-hidden">
@@ -39,22 +48,19 @@
   </div>
 
   <div class="flex-1 flex items-center gap-3 flex-wrap md:flex-nowrap">
-    <div class="relative flex-1 min-w-[160px] max-w-sm">
-      <input id="searchInput" type="text" placeholder="Rechercher un site ou un TCHE..."
+    <div class="relative flex-1 min-w-[240px] max-w-md" id="searchWrap">
+      <input id="searchInput" type="text" placeholder="Rechercher un site ou un secteur..." autocomplete="off"
         class="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500 transition" />
-      <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
       </svg>
+      <div id="searchResults" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-[1200] overflow-hidden max-h-72 overflow-y-auto"></div>
     </div>
 
     <select id="sgrFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/60">
       <option value="all">SGR : Tous</option>
       <option value="positive">SGR : Positif</option>
       <option value="negative">SGR : Négatif</option>
-    </select>
-
-    <select id="siteFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/60">
-      <option value="all">Site : Tous</option>
     </select>
   </div>
 
@@ -75,8 +81,8 @@
   <p class="font-semibold text-slate-900 mb-2 tracking-wide">SGR moyen (%/jour)</p>
   <div class="space-y-1.5">
     <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-700 text-white">&gt; 4</span> Forte croissance</div>
-    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">1 → 4</span> Bonne croissance</div>
-    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-200 text-slate-900">0 → 1</span> Croissance faible</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">2 → 4</span> Bonne croissance</div>
+    <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-200 text-slate-900">0 → 2</span> Croissance faible</div>
     <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500 text-white">−2 → 0</span> Perte modérée</div>
     <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-700 text-white">&lt; −2</span> Perte sévère</div>
     <div class="flex items-center gap-2"><span class="inline-block min-w-[56px] text-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-400 text-slate-900">*</span> En attente</div>
@@ -96,10 +102,11 @@
     </div>
     <p id="sbTehakeSecteur" class="text-sm text-slate-500 mt-1.5"></p>
     <p id="sbTche" class="text-sm text-slate-500"></p>
-    <div class="mt-4 flex items-center gap-2">
+    <div class="mt-4 flex items-center gap-2 flex-wrap">
       <span class="text-xs uppercase tracking-wide text-slate-500">SGR moyen du site</span>
       <span id="sbSgrBadge" class="text-sm font-bold px-2.5 py-1 rounded-full">—</span>
     </div>
+    <div id="sbVarBadges" class="mt-2 flex items-center gap-1.5 flex-wrap"></div>
   </div>
   <div id="sbBody" class="flex-1 overflow-y-auto sidebar-scroll p-5 space-y-4"></div>
 </aside>
@@ -111,14 +118,15 @@
 // CONFIGURATION — ⚠️ 1 valeur à personnaliser : API_URL
 // ========================================================================
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbzBxW6fvNAbJTpN44R-T0S1R8BJKul3n42Y24xbGR-LyK28afGCOQ46XBwHi22rnTyYSg/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbyBAP0uduk1YxsM-_XrgGsaH208VPIwevE79Wi7kZufTzbfYirMK0JvNhgc-N9zn2y0QQ/exec",
   MAP_CENTER: [-23.38, 43.69],
   MAP_ZOOM: 12,
   MAP_BOUNDS_PADDING: [60, 60],
   REFRESH_MS: 5 * 60 * 1000,
+  ZOOM_SITE: 14,
   TILE_URL: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   TILE_ATTR: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics"
-  // Esri bloqué ou fond plus "papier" assorti au thème clair :
+  // Réseau bloquant Esri, ou fond plus "papier" :
   //   TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   //   TILE_ATTR: "© OpenStreetMap contributors"
 };
@@ -126,13 +134,15 @@ const CONFIG = {
 const SELECTORS = {
   map: "#map", sidebar: "#sidebar", sidebarOverlay: "#sidebarOverlay",
   sidebarBody: "#sbBody", sidebarTitle: "#sbTitle", sidebarTehake: "#sbTehakeSecteur",
-  sidebarTche: "#sbTche", sidebarBadge: "#sbSgrBadge", closeSidebarBtn: "#closeSidebar",
-  searchInput: "#searchInput", sgrFilter: "#sgrFilter", siteFilter: "#siteFilter",
+  sidebarTche: "#sbTche", sidebarBadge: "#sbSgrBadge", sidebarVarBadges: "#sbVarBadges",
+  closeSidebarBtn: "#closeSidebar",
+  searchInput: "#searchInput", searchResults: "#searchResults",
+  sgrFilter: "#sgrFilter",
   statusBadge: "#statusBadge", statusDot: "#statusDot", statusText: "#statusText"
 };
 
 // ========================================================================
-// RÈGLE DES COULEURS (5 niveaux + en attente) — identique au dashboard
+// RÈGLE DES COULEURS (v7 : 0→2 faible, 2→4 bonne)
 // ========================================================================
 const COLORS = {
   pending:  { hex: "#94a3b8", tw: "bg-slate-400",  text: "text-slate-500", txt: "#0f172a" },
@@ -146,7 +156,7 @@ const COLORS = {
 function statutKey(v) {
   if (v === null || v === undefined || isNaN(v)) return "pending";
   if (v > 4)   return "strong";
-  if (v >= 1)  return "good";
+  if (v >= 2)  return "good";
   if (v >= 0)  return "low";
   if (v >= -2) return "moderate";
   return "severe";
@@ -157,11 +167,12 @@ function statutKey(v) {
 // ========================================================================
 const STATE = {
   map: null, markersLayerGroup: null, markers: {},
-  sitesData: {}, geoJsonPoints: null, hasInitialFit: false
+  sitesData: {}, geoJsonPoints: null, hasInitialFit: false,
+  searchItems: [], searchActive: 0
 };
 
 // ========================================================================
-// DONNEES DE SECOURS — 6 sites = 6 niveaux de la légende
+// DONNEES DE SECOURS — 6 sites = 6 niveaux de la légende (SGR cumulés)
 // ========================================================================
 const MOCK_GEOJSON = {
   type: "FeatureCollection",
@@ -169,43 +180,43 @@ const MOCK_GEOJSON = {
     { type: "Feature", geometry: { type: "Point", coordinates: [43.7600, -23.3100] }, properties: {
       site_id: "TAM", code_site: "TAM", site_nom: "Tambalang Nord", secteur: "BTL", tche: "Tovondrana Ariside", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "02/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "17/08/2025", duree: "15", txcr_calc: "+4.62", nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "01/09/2025", duree: "15", txcr_calc: "+5.10", nb: 30 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "02/08/2025", duree: "",  txcr_calc: "*",     nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "17/08/2025", duree: "15", txcr_calc: "+5.10", nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "01/09/2025", duree: "30", txcr_calc: "+4.86", nb: 30, variete: "Spinosum" }
       ] } },
     { type: "Feature", geometry: { type: "Point", coordinates: [43.6890, -23.3540] }, properties: {
       site_id: "BLM", code_site: "BLM", site_nom: "Ambolimoke", secteur: "ADK", tche: "Hajatiana Arstide", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+1.56", nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "31/08/2025", duree: "15", txcr_calc: "+0.98", nb: 29 },
-        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
-        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+1.10", nb: 30 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+2.62", nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "31/08/2025", duree: "30", txcr_calc: "+2.30", nb: 29, variete: "Spinosum" },
+        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P0", date_pesage: "01/08/2025", duree: "",  txcr_calc: "*",     nb: 30, variete: "Tambalang (Cottonii)" },
+        { ligne_test: "LT 2 (Tehake THK5)", pesage: "P1", date_pesage: "16/08/2025", duree: "15", txcr_calc: "+1.98", nb: 30, variete: "Tambalang (Cottonii)" }
       ] } },
     { type: "Feature", geometry: { type: "Point", coordinates: [43.6550, -23.4020] }, properties: {
       site_id: "BVK", code_site: "BVK", site_nom: "Belavenoky", secteur: "BDA", tche: "Franco", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "05/08/2025", duree: "",  txcr_calc: "*",    nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "20/08/2025", duree: "15", txcr_calc: "+0.45", nb: 30 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "05/08/2025", duree: "",  txcr_calc: "*",    nb: 30, variete: "Sacol (Cottonii)" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "20/08/2025", duree: "15", txcr_calc: "+0.45", nb: 30, variete: "Sacol (Cottonii)" }
       ] } },
     { type: "Feature", geometry: { type: "Point", coordinates: [43.6720, -23.3810] }, properties: {
       site_id: "APL", code_site: "APL", site_nom: "Ampasilava", secteur: "ADK", tche: "Bonhôte", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-0.42", nb: 29 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "15", txcr_calc: "-0.15", nb: 29 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-0.42", nb: 29, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "30", txcr_calc: "-0.30", nb: 29, variete: "Spinosum" }
       ] } },
     { type: "Feature", geometry: { type: "Point", coordinates: [43.7180, -23.3900] }, properties: {
       site_id: "TSM", code_site: "TSM", site_nom: "Antsatsamoroy", secteur: "MKN", tche: "Sandrine", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-2.40", nb: 28 },
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "15", txcr_calc: "-1.80", nb: 27 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "03/08/2025", duree: "",  txcr_calc: "*",     nb: 30, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P1", date_pesage: "18/08/2025", duree: "15", txcr_calc: "-2.40", nb: 28, variete: "Spinosum" },
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P2", date_pesage: "02/09/2025", duree: "30", txcr_calc: "-2.10", nb: 27, variete: "Spinosum" }
       ] } },
     { type: "Feature", geometry: { type: "Point", coordinates: [43.7010, -23.3650] }, properties: {
       site_id: "TSG", code_site: "TSG", site_nom: "Tserananangy", secteur: "MKN", tche: "TOVO Irène Julie", tehake: "THK5",
       rows: [
-        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "07/08/2025", duree: "", txcr_calc: "*", nb: 30 }
+        { ligne_test: "LT 1 (Tehake THK5)", pesage: "P0", date_pesage: "07/08/2025", duree: "", txcr_calc: "*", nb: 30, variete: "Spinosum" }
       ] } }
   ]
 };
@@ -238,13 +249,7 @@ function parseFrDate(s) {
   return null;
 }
 
-function shortDate(d) {
-  return d ? `${("0" + d.getDate()).slice(-2)}/${("0" + (d.getMonth() + 1)).slice(-2)}` : "—";
-}
-
-function pesageShort(p) {
-  return String(p || "").split("—")[0].trim() || "P?";
-}
+function varBase(v) { return String(v || "").split("(")[0].trim(); }
 
 // ========================================================================
 // CHARGEMENT DES DONNEES
@@ -285,14 +290,47 @@ function ingest(geo) {
 }
 
 // ========================================================================
-// CALCULS
+// CALCULS — SGR CUMULÉS
 // ========================================================================
+// Moyenne du site (Q1-A) : une valeur par ligne (la DERNIÈRE pesée avec SGR)
 function computeSgrMoyen(rows) {
-  const values = rows.map(r => parseTxcr(r.txcr_calc)).filter(v => v !== null);
-  if (values.length === 0) return null;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+  const byLine = {};
+  rows.forEach(r => (byLine[r.ligne_test] = byLine[r.ligne_test] || []).push(r));
+  const lasts = [];
+  Object.values(byLine).forEach(rs => {
+    const sorted = rs.slice().sort((a, b) =>
+      (parseFrDate(a.date_pesage)?.getTime() || 0) - (parseFrDate(b.date_pesage)?.getTime() || 0));
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const v = parseTxcr(sorted[i].txcr_calc);
+      if (v !== null) { lasts.push(v); break; }
+    }
+  });
+  if (!lasts.length) return null;
+  return lasts.reduce((a, b) => a + b, 0) / lasts.length;
 }
 
+// ========================================================================
+// STEPPER DE CYCLE — P0 — P1 — P2 — P3 — P4 — PR (progression dynamique)
+// ========================================================================
+const CYCLE_STAGES = [0, 1, 2, 3, 4, "PR"];
+
+function cycleStepperHtml(stepper) {
+  if (!stepper) return "";
+  const pill = st => {
+    const label = st === "PR" ? "PR" : "P" + st;
+    const reached = stepper.reached.includes(st);
+    const current = stepper.current === st;
+    const cls = "cycle-step " + (current ? "current" : reached ? "reached" : "future");
+    return `<span class="${cls}">${label}</span>`;
+  };
+  return `<div class="cycle-stepper">` +
+    CYCLE_STAGES.map((s, i) =>
+      (i ? `<span class="cycle-link">—</span>` : "") + pill(s)
+    ).join("") +
+    `</div>`;
+}
+
+// Une seule RANGÉE par ligne : la DERNIÈRE pesée (remplacée dynamiquement)
 function buildLineTables(rows) {
   const byLine = rows.reduce((acc, row) => {
     (acc[row.ligne_test] = acc[row.ligne_test] || []).push(row);
@@ -305,21 +343,42 @@ function buildLineTables(rows) {
   return lineNames.map(lineName => {
     const sorted = byLine[lineName].slice().sort((a, b) =>
       (parseFrDate(a.date_pesage)?.getTime() || 0) - (parseFrDate(b.date_pesage)?.getTime() || 0));
-    const intervals = [];
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1], curr = sorted[i];
-      intervals.push({
-        label: `${pesageShort(prev.pesage)} → ${pesageShort(curr.pesage)}`,
-        dates: `${shortDate(parseFrDate(prev.date_pesage))} → ${shortDate(parseFrDate(curr.date_pesage))}`,
-        duree: curr.duree ? `${curr.duree}j` : "—",
-        sgr: curr.txcr_calc,
-        boutures: (prev.nb != null && curr.nb != null)
-          ? `${prev.nb} → ${curr.nb}`
-          : (curr.nb != null ? String(curr.nb) : "—"),
-        perte: prev.nb != null && curr.nb != null && curr.nb < prev.nb
-      });
-    }
-    return { lineName, intervals };
+
+    const last = sorted[sorted.length - 1];
+    const prev = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+    const p0 = sorted[0];
+    const nb = last.nb != null ? parseInt(last.nb, 10) : null;
+    const prevNb = prev && prev.nb != null ? parseInt(prev.nb, 10) : null;
+
+    // ---- Progression du cycle : quelles étapes P0..P4/PR sont atteintes ?
+    const reached = [];
+    sorted.forEach(r => {
+      const lab = String(r.pesage || "").trim().toUpperCase();
+      const mNum = lab.match(/^P(\d+)/);
+      if (mNum) {
+        const st = +mNum[1];
+        if (!reached.includes(st)) reached.push(st);
+      } else if (lab.startsWith("PR")) {
+        if (!reached.includes("PR")) reached.push("PR");
+      }
+    });
+    const lastLab = String(last.pesage || "").trim().toUpperCase();
+    const lastNum = lastLab.match(/^P(\d+)/);
+    const current = lastNum ? +lastNum[1] : (lastLab.startsWith("PR") ? "PR" : null);
+
+    return {
+      lineName,
+      planteLe: p0 ? p0.date_pesage : null,
+      stepper: { reached: reached, current: current },
+      pesees: [{
+        pesage: last.pesage,
+        date: last.date_pesage,
+        depuisP0: last.duree ? `${last.duree} j` : "—",
+        boutures: (nb != null && !isNaN(nb)) ? String(nb) : "—",
+        perte: prevNb != null && nb != null && !isNaN(nb) && nb < prevNb,
+        sgr: last.txcr_calc
+      }]
+    };
   });
 }
 
@@ -327,8 +386,7 @@ function buildLineTables(rows) {
 // COULEURS
 // ========================================================================
 function getColorForSgr(value) {
-  const val = typeof value === "string" ? parseTxcr(value) : value;
-  return COLORS[statutKey(val)];
+  return COLORS[statutKey(value)];
 }
 
 function getColorClassForSgr(value) {
@@ -395,6 +453,7 @@ function openSidebar(siteId) {
   const $tehake = document.querySelector(SELECTORS.sidebarTehake);
   const $tche = document.querySelector(SELECTORS.sidebarTche);
   const $badge = document.querySelector(SELECTORS.sidebarBadge);
+  const $varBadges = document.querySelector(SELECTORS.sidebarVarBadges);
   const $body = document.querySelector(SELECTORS.sidebarBody);
   const $sidebar = document.querySelector(SELECTORS.sidebar);
   const $overlay = document.querySelector(SELECTORS.sidebarOverlay);
@@ -411,6 +470,20 @@ function openSidebar(siteId) {
     $badge.className = `text-sm font-bold px-2.5 py-1 rounded-full ${color.tw} ${color.txt === "#ffffff" ? "text-white" : "text-slate-900"}`;
   }
 
+  // Badges SGR PAR VARIÉTÉ (format agrandi)
+  if ($varBadges) {
+    const byVar = {};
+    site.rows.forEach(r => {
+      const v = varBase(r.variete) || "—";
+      (byVar[v] = byVar[v] || []).push(r);
+    });
+    $varBadges.innerHTML = Object.entries(byVar).map(([v, rs]) => {
+      const m = computeSgrMoyen(rs);
+      const c = getColorForSgr(m);
+      return `<span class="text-xs font-bold px-3 py-1 rounded-full ${c.tw} ${c.txt === "#ffffff" ? "text-white" : "text-slate-900"}" title="SGR moyen — ${v}">${v} <span class="ml-1">${m === null ? "*" : (m > 0 ? "+" : "") + m.toFixed(2)}</span></span>`;
+    }).join("");
+  }
+
   if ($body) {
     $body.innerHTML = "";
     const lineTables = buildLineTables(site.rows);
@@ -423,29 +496,26 @@ function openSidebar(siteId) {
       const card = document.createElement("div");
       card.className = "bg-slate-50 border border-slate-200 rounded-xl p-4";
 
-      let rowsHtml = "";
-      if (lt.intervals.length === 0) {
-        rowsHtml = `<tr><td colspan="5" class="text-xs text-slate-500 italic py-2">En attente de la prochaine pesée</td></tr>`;
-      } else {
-        rowsHtml = lt.intervals.map(iv => `
+      const rowsHtml = lt.pesees.map(pe => `
           <tr class="border-t border-slate-200">
-            <td class="py-2 pr-2 text-slate-700 text-xs">${iv.label}</td>
-            <td class="py-2 pr-2 text-slate-500 text-xs">${iv.dates}</td>
-            <td class="py-2 pr-2 text-slate-500 text-xs">${iv.duree}</td>
-            <td class="py-2 pr-2 text-xs ${iv.perte ? "text-amber-600" : "text-slate-500"}">${iv.boutures}</td>
-            <td class="py-2 text-xs ${getColorClassForSgr(iv.sgr)}">${iv.sgr === "*" ? "En attente" : iv.sgr}</td>
+            <td class="py-2 pr-2 text-slate-700 text-xs font-semibold">${pe.pesage}</td>
+            <td class="py-2 pr-2 text-slate-500 text-xs">${pe.date}</td>
+            <td class="py-2 pr-2 text-slate-500 text-xs">${pe.depuisP0}</td>
+            <td class="py-2 pr-2 text-xs ${pe.perte ? "text-amber-600" : "text-slate-500"}">${pe.boutures}${pe.perte ? " ↓" : ""}</td>
+            <td class="py-2 text-xs ${getColorClassForSgr(pe.sgr)}">${pe.sgr === "*" ? "—" : pe.sgr}</td>
           </tr>`).join("");
-      }
 
       card.innerHTML = `
-        <h3 class="text-cyan-600 font-semibold text-sm mb-2 tracking-wide">Ligne ${lt.lineName}</h3>
-        <table class="interval-table text-left">
-          <colgroup><col style="width:24%"><col style="width:22%"><col style="width:10%"><col style="width:16%"><col style="width:28%"></colgroup>
+        <h3 class="text-cyan-600 font-semibold text-sm mb-0.5 tracking-wide">${lt.lineName}</h3>
+        ${lt.planteLe ? `<p class="text-[11px] text-slate-400 mb-1">Planté le ${lt.planteLe}</p>` : `<p class="mb-1"></p>`}
+        ${cycleStepperHtml(lt.stepper)}
+        <table class="interval-table text-left mt-2">
+          <colgroup><col style="width:16%"><col style="width:28%"><col style="width:18%"><col style="width:16%"><col style="width:22%"></colgroup>
           <thead>
             <tr class="text-[10px] uppercase text-slate-500 tracking-wide">
-              <th class="pb-1.5 font-medium">Intervalle</th>
-              <th class="pb-1.5 font-medium">Dates</th>
-              <th class="pb-1.5 font-medium">Durée</th>
+              <th class="pb-1.5 font-medium">Pesée</th>
+              <th class="pb-1.5 font-medium">Date</th>
+              <th class="pb-1.5 font-medium">P0</th>
               <th class="pb-1.5 font-medium">Bout.</th>
               <th class="pb-1.5 font-medium">SGR</th>
             </tr>
@@ -469,43 +539,147 @@ document.querySelector(SELECTORS.closeSidebarBtn)?.addEventListener("click", clo
 document.querySelector(SELECTORS.sidebarOverlay)?.addEventListener("click", closeSidebar);
 
 // ========================================================================
-// FILTRES
+// RECHERCHE AVEC AUTOCOMPLÉTION (sites + secteurs) + ZOOM
 // ========================================================================
-function populateSiteFilter() {
-  const $select = document.querySelector(SELECTORS.siteFilter);
-  if (!$select) return;
-  Object.keys(STATE.sitesData).sort().forEach(code => {
-    const opt = document.createElement("option");
-    opt.value = code;
-    opt.textContent = `${code} — ${STATE.sitesData[code].site_nom}`;
-    $select.appendChild(opt);
-  });
+function buildSuggestions(query) {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  const all = Object.values(STATE.sitesData);
+
+  const siteMatches = all
+    .filter(s => `${s.code_site} ${s.site_nom} ${s.tche}`.toLowerCase().includes(q))
+    .sort((a, b) => a.code_site.localeCompare(b.code_site))
+    .slice(0, 8)
+    .map(s => ({
+      type: "site", siteId: s.code_site,
+      label: `${s.code_site} — ${s.site_nom}`,
+      sub: `Secteur ${s.secteur || "—"}${s.tche ? " · " + s.tche : ""}`
+    }));
+
+  const bySec = {};
+  all.forEach(s => (bySec[s.secteur || "—"] = (bySec[s.secteur || "—"] || 0) + 1));
+  const secMatches = Object.keys(bySec)
+    .filter(sec => sec.toLowerCase().includes(q))
+    .sort()
+    .map(sec => ({ type: "secteur", secteur: sec, label: `Secteur ${sec}`, sub: `${bySec[sec]} site(s)` }));
+
+  return [...siteMatches, ...secMatches].slice(0, 10);
 }
 
+function renderResults(items) {
+  const $r = document.querySelector(SELECTORS.searchResults);
+  STATE.searchItems = items;
+  STATE.searchActive = 0;
+  if (!items.length) {
+    $r.innerHTML = `<p class="px-3 py-2.5 text-xs text-slate-400 italic">Aucun résultat</p>`;
+  } else {
+    $r.innerHTML = items.map((it, i) => `
+      <button type="button" data-idx="${i}"
+        class="search-item w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-emerald-50 transition ${i === 0 ? "bg-emerald-50/60" : ""}">
+        <span class="shrink-0">${it.type === "site" ? "📍" : "🗺️"}</span>
+        <span class="flex-1 min-w-0">
+          <span class="block text-xs font-semibold text-slate-800 truncate">${it.label}</span>
+          <span class="block text-[10px] text-slate-400 truncate">${it.sub}</span>
+        </span>
+      </button>`).join("");
+  }
+  $r.classList.remove("hidden");
+}
+
+function hideResults() {
+  document.querySelector(SELECTORS.searchResults)?.classList.add("hidden");
+}
+
+function highlightResults() {
+  document.querySelectorAll("#searchResults .search-item").forEach((el, i) => {
+    el.classList.toggle("bg-emerald-50", i === STATE.searchActive);
+  });
+  const active = document.querySelectorAll("#searchResults .search-item")[STATE.searchActive];
+  active?.scrollIntoView({ block: "nearest" });
+}
+
+function chooseItem(it) {
+  hideResults();
+  document.querySelector(SELECTORS.searchInput).value = "";
+  if (!it) return;
+  if (it.type === "site") zoomToSite(it.siteId);
+  else zoomToSecteur(it.secteur);
+}
+
+function zoomToSite(siteId) {
+  const f = STATE.geoJsonPoints.features.find(x => x.properties.site_id === siteId);
+  if (!f) return;
+  const [lng, lat] = f.geometry.coordinates;
+  STATE.map.setView([lat, lng], Math.max(STATE.map.getZoom(), CONFIG.ZOOM_SITE));
+  openSidebar(siteId);
+}
+
+function zoomToSecteur(sec) {
+  const pts = [];
+  STATE.geoJsonPoints.features.forEach(f => {
+    if ((f.properties.secteur || "—") === sec) pts.push(f.geometry.coordinates);
+  });
+  if (!pts.length) return;
+  STATE.map.fitBounds(L.latLngBounds(pts.map(c => [c[1], c[0]])), { padding: CONFIG.MAP_BOUNDS_PADDING, maxZoom: CONFIG.ZOOM_SITE });
+}
+
+(function initSearch() {
+  const $input = document.querySelector(SELECTORS.searchInput);
+  const $results = document.querySelector(SELECTORS.searchResults);
+  if (!$input || !$results) return;
+
+  $input.addEventListener("input", () => {
+    const q = $input.value.trim();
+    if (!q) { hideResults(); return; }
+    renderResults(buildSuggestions(q));
+  });
+
+  $input.addEventListener("keydown", e => {
+    if ($results.classList.contains("hidden")) return;
+    const items = STATE.searchItems || [];
+    if (!items.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      STATE.searchActive = (STATE.searchActive + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length;
+      highlightResults();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      chooseItem(items[STATE.searchActive] || items[0]);
+    } else if (e.key === "Escape") {
+      hideResults();
+    }
+  });
+
+  $results.addEventListener("click", e => {
+    const btn = e.target.closest(".search-item");
+    if (!btn) return;
+    chooseItem(STATE.searchItems[+btn.dataset.idx]);
+  });
+
+  document.addEventListener("click", e => {
+    if (!e.target.closest("#searchWrap")) hideResults();
+  });
+})();
+
+// ========================================================================
+// FILTRE SGR
+// ========================================================================
 function applyFilters() {
-  const query = (document.querySelector(SELECTORS.searchInput)?.value || "").trim().toLowerCase();
   const sgrFilterVal = document.querySelector(SELECTORS.sgrFilter)?.value || "all";
-  const siteFilterVal = document.querySelector(SELECTORS.siteFilter)?.value || "all";
   const visible = new Set();
 
   Object.values(STATE.sitesData).forEach(site => {
     let matches = true;
-    if (siteFilterVal !== "all" && site.code_site !== siteFilterVal) matches = false;
-    if (matches && query) {
-      const haystack = `${site.site_nom} ${site.code_site} ${site.tche}`.toLowerCase();
-      if (!haystack.includes(query)) matches = false;
-    }
-    if (matches && sgrFilterVal === "positive" && !(site.sgrMoyen !== null && site.sgrMoyen > 0)) matches = false;
-    if (matches && sgrFilterVal === "negative" && !(site.sgrMoyen !== null && site.sgrMoyen < 0)) matches = false;
+    const sgr = site.sgrMoyen;
+    if (sgrFilterVal === "positive" && !(sgr !== null && sgr > 0)) matches = false;
+    if (sgrFilterVal === "negative" && !(sgr !== null && sgr < 0)) matches = false;
     if (matches) visible.add(site.code_site);
   });
 
   renderMarkers(visible);
 }
 
-document.querySelector(SELECTORS.searchInput)?.addEventListener("input", applyFilters);
 document.querySelector(SELECTORS.sgrFilter)?.addEventListener("change", applyFilters);
-document.querySelector(SELECTORS.siteFilter)?.addEventListener("change", applyFilters);
 
 // ========================================================================
 // BOOTSTRAP + RAFRAICHISSEMENT AUTO (5 min)
@@ -513,7 +687,6 @@ document.querySelector(SELECTORS.siteFilter)?.addEventListener("change", applyFi
 async function bootstrap() {
   initMap();
   ingest(await loadData(false));
-  populateSiteFilter();
   renderMarkers(null);
 }
 

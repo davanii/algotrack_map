@@ -40,7 +40,7 @@
 
 <main class="max-w-7xl mx-auto px-4 pt-20 pb-10 space-y-4">
 
-  <!-- ============ FILTRES (cascade : Secteur → Site, Secteur → Variété) ============ -->
+  <!-- ============ FILTRES (cascade : Secteur → Site → Zone, Secteur → Variété) ============ -->
   <section class="panel p-3 flex items-center gap-3 flex-wrap">
     <span class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">Filtres</span>
     <select id="secteurFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
@@ -48,6 +48,9 @@
     </select>
     <select id="siteFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
       <option value="all">Site : Tous</option>
+    </select>
+    <select id="zoneFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
+      <option value="all">Zone : Toutes</option>
     </select>
     <select id="varieteFilter" class="bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-3 text-xs text-slate-900">
       <option value="all">Variété : Toutes</option>
@@ -389,7 +392,7 @@ async function loadData(strict) {
 }
 
 // ========================================================================
-// MOYENNE PAR LIGNE (Q1-A) : dernière pesée avec SGR de chaque ligne_test
+// MOYENNE PAR LIGNE (Q1-A)
 // ========================================================================
 function moyenneParLigne(rows) {
   const byLine = {};
@@ -1040,8 +1043,9 @@ function periodDateMin() {
   return d;
 }
 
-// Filtres DÉPENDANTS : Site liste les sites du Secteur choisi,
-// Variété liste les variétés présentes dans ce Secteur
+// Filtres DÉPENDANTS (cascade) :
+//   Secteur → Site, Secteur → Zone, Secteur → Variété
+//   Site → Zone (si un site est choisi, seules SES zones sont listées)
 function populateFilters() {
   const feats = dernierGeoFull?.features || [];
 
@@ -1064,10 +1068,22 @@ function populateFilters() {
   if (sitesList.some(p => p.site_id === curSite)) $site.value = curSite;
   else $site.value = "all";
 
+  // Zone de culture : dépend du Secteur ET du Site si sélectionné
+  const $zone = document.querySelector("#zoneFilter");
+  const curZone = $zone.value;
+  const featsScope = $site.value === "all" ? featsOfSector
+    : featsOfSector.filter(f => f.properties.site_id === $site.value);
+  const zones = new Set();
+  featsScope.forEach(f => (f.properties.rows || []).forEach(r => { const z = (r.zone || "").trim(); if (z) zones.add(z); }));
+  $zone.innerHTML = '<option value="all">Zone : Toutes</option>' +
+    [...zones].sort().map(z => `<option value="${z}">Zone : ${z}</option>`).join("");
+  if ([...zones].includes(curZone)) $zone.value = curZone;
+  else $zone.value = "all";
+
   const $var = document.querySelector("#varieteFilter");
   const curVar = $var.value;
   const vars = new Set();
-  featsOfSector.forEach(f => (f.properties.rows || []).forEach(r => { const v = varBase(r.variete); if (v) vars.add(v); }));
+  featsScope.forEach(f => (f.properties.rows || []).forEach(r => { const v = varBase(r.variete); if (v) vars.add(v); }));
   $var.innerHTML = '<option value="all">Variété : Toutes</option>' +
     [...vars].sort().map(v => `<option value="${v}">Variété : ${v}</option>`).join("");
   if ([...vars].includes(curVar)) $var.value = curVar;
@@ -1078,6 +1094,7 @@ function renderAll() {
   if (!dernierGeoFull) return;
   const sec = document.querySelector("#secteurFilter").value;
   const siteF = document.querySelector("#siteFilter").value;
+  const zoneF = document.querySelector("#zoneFilter").value;
   const varF = document.querySelector("#varieteFilter").value;
   const dateMin = periodDateMin();
   const tri = document.querySelector("#sortSelect").value;
@@ -1088,6 +1105,10 @@ function renderAll() {
   if (varF !== "all")
     features = features
       .map(f => ({ ...f, properties: { ...f.properties, rows: (f.properties.rows || []).filter(r => varBase(r.variete) === varF) } }))
+      .filter(f => f.properties.rows.length > 0);
+  if (zoneF !== "all")
+    features = features
+      .map(f => ({ ...f, properties: { ...f.properties, rows: (f.properties.rows || []).filter(r => (r.zone || "").trim() === zoneF) } }))
       .filter(f => f.properties.rows.length > 0);
   const geo = { ...dernierGeoFull, features };
 
@@ -1174,12 +1195,17 @@ async function refresh(strict) {
 
 // ---- Événements
 document.querySelector("#sortSelect").addEventListener("change", renderAll);
-// Secteur : régénère les listes Site/Variété (cascade) puis recalcule
+// Secteur : régénère les listes Site/Zone/Variété (cascade) puis recalcule
 document.querySelector("#secteurFilter").addEventListener("change", () => {
   populateFilters();
   renderAll();
 });
-document.querySelector("#siteFilter").addEventListener("change", renderAll);
+// Site : régénère les listes Zone/Variété (cascade) puis recalcule
+document.querySelector("#siteFilter").addEventListener("change", () => {
+  populateFilters();
+  renderAll();
+});
+document.querySelector("#zoneFilter").addEventListener("change", renderAll);
 document.querySelector("#varieteFilter").addEventListener("change", renderAll);
 document.querySelector("#periodeFilter").addEventListener("change", renderAll);
 document.querySelector("#csvBtn").addEventListener("click", () => exportCSV(dernierSites));
